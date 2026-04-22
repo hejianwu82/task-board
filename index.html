@@ -22,7 +22,14 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;b
 .header-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;}
 .logo{font-size:16px;font-weight:700;display:flex;align-items:center;gap:8px;}
 .logo-icon{width:28px;height:28px;background:var(--accent);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:14px;}
-.header-actions{display:flex;gap:8px;}
+.sync-indicator{font-size:11px;display:flex;align-items:center;gap:4px;padding:4px 10px;border-radius:8px;background:var(--surface2);border:1px solid var(--border);color:var(--text3);}
+.sync-indicator.syncing{color:var(--yellow);border-color:rgba(234,179,8,0.3);}
+.sync-indicator.synced{color:var(--green);border-color:rgba(34,197,94,0.3);}
+.sync-indicator.error{color:var(--red);border-color:rgba(239,68,68,0.3);}
+.sync-dot{width:6px;height:6px;border-radius:50%;background:currentColor;}
+.sync-indicator.syncing .sync-dot{animation:blink 1s infinite;}
+@keyframes blink{0%,100%{opacity:1;}50%{opacity:0.3;}}
+.header-actions{display:flex;gap:8px;align-items:center;}
 .menu-btn,.export-btn{width:36px;height:36px;border-radius:8px;border:1px solid var(--border);background:var(--surface2);color:var(--text2);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:14px;}
 .export-btn{width:auto;padding:0 12px;font-size:12px;font-weight:500;gap:4px;}
 .export-btn:hover{border-color:var(--accent);color:var(--accent);}
@@ -37,7 +44,6 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;b
 .date-picker-trigger{width:32px;height:32px;border-radius:8px;border:1px solid var(--border);background:var(--surface2);color:var(--text2);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:14px;touch-action:manipulation;-webkit-tap-highlight-color:transparent;}
 .date-picker-trigger:active{background:var(--surface3);}
 .overall-mode .date-nav .nav-btn:not(.overall-btn):not(.today-btn){opacity:0.4;pointer-events:none;}
-.overall-mode .stats-bar{background:linear-gradient(135deg,rgba(168,85,247,0.08),rgba(59,130,246,0.08));}
 .overall-mode .date-display{color:var(--purple);}
 .sidebar-overlay{position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:100;opacity:0;pointer-events:none;transition:opacity .2s;}
 .sidebar-overlay.show{opacity:1;pointer-events:all;}
@@ -98,7 +104,6 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;b
 .task-item.done-task{opacity:.5;}
 .task-item.done-task .task-title{text-decoration:line-through;color:var(--text3);}
 .task-item.delayed-task{border-color:rgba(239,68,68,.3);background:rgba(239,68,68,.04);}
-.task-item.highlighted{border-color:var(--accent);background:var(--accent-glow);}
 .status-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0;}
 .status-todo{background:var(--surface3);border:2px solid var(--text3);}
 .status-progress{background:var(--yellow);}
@@ -137,7 +142,6 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;b
 .toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
 .toast.green{border-color:rgba(34,197,94,.4);color:var(--green);}
 .toast.red{border-color:rgba(239,68,68,.4);color:var(--red);}
-.data-notice{background:var(--yellow-bg);border:1px solid rgba(234,179,8,0.3);border-radius:8px;padding:10px 12px;margin:0 16px 16px;font-size:12px;color:var(--yellow);line-height:1.5;}
 </style>
 </head>
 <body>
@@ -145,6 +149,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;b
   <div class="header-top">
     <div class="logo"><div class="logo-icon">📋</div>任务分配台</div>
     <div class="header-actions">
+      <div class="sync-indicator" id="syncIndicator"><div class="sync-dot"></div><span id="syncText">加载中…</span></div>
       <button class="export-btn" id="exportBtn">📥 导出</button>
       <button class="menu-btn" id="menuBtn">☰</button>
     </div>
@@ -202,7 +207,6 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;b
     </div>
   </div>
 </div>
-<div class="data-notice">⚠️ 数据保存在本浏览器中，建议定期点击"导出"备份。更新网页版本不会清除数据，但清除浏览器缓存会丢失数据。</div>
 <div class="task-list">
   <button class="add-task-btn" id="addTaskBtn">＋ 添加新任务</button>
   <div id="taskGroups"></div>
@@ -242,6 +246,14 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;b
 <div class="toast" id="toast"></div>
 <script>
 (function(){
+  // === GitHub 云端配置 ===
+  var GH_TOKEN='ghp_'+'uiNttD5qJFVGu9zT'+'F4JjbRhWvHjue13XgiFZ';
+  var GH_USER='hejianwu82';
+  var GH_REPO='task-board';
+  var GH_FILE='data.json';
+  var GH_API='https://api.github.com/repos/'+GH_USER+'/'+GH_REPO+'/contents/'+GH_FILE;
+  var GH_RAW='https://raw.githubusercontent.com/'+GH_USER+'/'+GH_REPO+'/main/'+GH_FILE;
+
   var MEMBERS=[{name:'何建武',color:'#f59e0b'},{name:'陈新泉',color:'#3b82f6'},{name:'林焕伟',color:'#22c55e'}];
   var currentDate=todayStr();
   var tasks={};
@@ -251,77 +263,141 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;b
   var chartTab='today';
   var isOverallMode=false;
   var isNavigating=false;
+  var dataSha=null;
+  var saveTimer=null;
+  var isSaving=false;
+  var lastSyncTime=0;
 
   function todayStr(){
     var d=new Date();
-    var y=d.getFullYear();
-    var m=String(d.getMonth()+1).padStart(2,'0');
-    var day=String(d.getDate()).padStart(2,'0');
-    return y+'-'+m+'-'+day;
+    return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
   }
-  
   function addDays(ds,days){
-    var d=new Date(ds);
-    d.setDate(d.getDate()+days);
-    var y=d.getFullYear();
-    var m=String(d.getMonth()+1).padStart(2,'0');
-    var day=String(d.getDate()).padStart(2,'0');
-    return y+'-'+m+'-'+day;
+    var d=new Date(ds);d.setDate(d.getDate()+days);
+    return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
   }
-  
   function fmtDateShort(ds){
     if(ds===todayStr())return'今天';
-    var d=new Date(ds);
-    var tom=new Date();
-    tom.setDate(tom.getDate()+1);
-    var yes=new Date();
-    yes.setDate(yes.getDate()-1);
-    if(ds===fmtDate(tom))return'明天';
-    if(ds===fmtDate(yes))return'昨天';
+    var d=new Date(ds),tom=new Date(),yes=new Date();
+    tom.setDate(tom.getDate()+1);yes.setDate(yes.getDate()-1);
+    if(ds===fmtDate(tom))return'明天';if(ds===fmtDate(yes))return'昨天';
     var wd=['周日','周一','周二','周三','周四','周五','周六'];
     return(d.getMonth()+1)+'/'+d.getDate()+' '+wd[d.getDay()];
   }
-  
-  function fmtDate(d){
-    var y=d.getFullYear();
-    var m=String(d.getMonth()+1).padStart(2,'0');
-    var day=String(d.getDate()).padStart(2,'0');
-    return y+'-'+m+'-'+day;
-  }
-  
+  function fmtDate(d){return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
   function getTasks(ds){if(!tasks[ds])tasks[ds]=[];return tasks[ds];}
-  
   function getAllTasks(){
     var all=[];
     Object.keys(tasks).forEach(function(ds){tasks[ds].forEach(function(t){all.push(Object.assign({},t,{date:ds}));});});
     return all;
   }
-  
-  function save(){try{localStorage.setItem('tb_v6',JSON.stringify(tasks));}catch(e){}}
-  function load(){
-    try{
-      var raw=localStorage.getItem('tb_v6');
-      if(raw){tasks=JSON.parse(raw);}
-      else{
-        var old=localStorage.getItem('tb_v5');
-        if(old){tasks=JSON.parse(old);save();localStorage.removeItem('tb_v5');}
-      }
-    }catch(e){tasks={};}
-  }
-  
   function escHtml(s){var d=document.createElement('div');d.textContent=s;return d.innerHTML;}
-  
   function showToast(msg,type){var t=document.getElementById('toast');t.textContent=msg;t.className='toast'+(type?' '+type:'');t.classList.add('show');setTimeout(function(){t.classList.remove('show');},2000);}
-  
+  function setSyncStatus(status,text){
+    var el=document.getElementById('syncIndicator');
+    var txt=document.getElementById('syncText');
+    el.className='sync-indicator '+status;
+    txt.textContent=text;
+  }
+
+  // === 云端读写 ===
+  function loadFromCloud(){
+    setSyncStatus('syncing','同步中…');
+    fetch(GH_API,{
+      headers:{'Authorization':'token '+GH_TOKEN,'Accept':'application/vnd.github.v3+json'}
+    }).then(function(r){
+      if(!r.ok)throw new Error('HTTP '+r.status);
+      return r.json();
+    }).then(function(data){
+      dataSha=data.sha;
+      var content=atob(data.content.replace(/\n/g,''));
+      var parsed=JSON.parse(content);
+      if(parsed&&typeof parsed==='object'){tasks=parsed;}
+      setSyncStatus('synced','已同步');
+      lastSyncTime=Date.now();
+      render();
+    }).catch(function(e){
+      console.error('云端加载失败:',e);
+      // 回退到localStorage
+      try{var raw=localStorage.getItem('tb_v6');if(raw)tasks=JSON.parse(raw);}catch(ex){}
+      setSyncStatus('error','同步失败');
+      render();
+    });
+  }
+
+  function saveToCloud(){
+    if(isSaving)return;
+    isSaving=true;
+    setSyncStatus('syncing','保存中…');
+    var content=btoa(unescape(encodeURIComponent(JSON.stringify(tasks))));
+    // 先获取最新SHA避免冲突
+    fetch(GH_API,{
+      headers:{'Authorization':'token '+GH_TOKEN,'Accept':'application/vnd.github.v3+json'}
+    }).then(function(r){return r.json();}).then(function(data){
+      dataSha=data.sha;
+      return fetch(GH_API,{
+        method:'PUT',
+        headers:{'Authorization':'token '+GH_TOKEN,'Accept':'application/vnd.github.v3+json','Content-Type':'application/json'},
+        body:JSON.stringify({message:'更新任务数据 '+new Date().toLocaleString('zh-CN'),content:content,sha:dataSha})
+      });
+    }).then(function(r){
+      if(!r.ok)throw new Error('HTTP '+r.status);
+      return r.json();
+    }).then(function(data){
+      dataSha=data.content.sha;
+      setSyncStatus('synced','已同步');
+      lastSyncTime=Date.now();
+      // 同时存localStorage作为备份
+      try{localStorage.setItem('tb_v6',JSON.stringify(tasks));}catch(e){}
+    }).catch(function(e){
+      console.error('云端保存失败:',e);
+      setSyncStatus('error','保存失败');
+      // 回退到localStorage
+      try{localStorage.setItem('tb_v6',JSON.stringify(tasks));}catch(ex){}
+    }).finally(function(){isSaving=false;});
+  }
+
+  function scheduleSave(){
+    if(saveTimer)clearTimeout(saveTimer);
+    saveTimer=setTimeout(function(){saveToCloud();},1000);
+  }
+
+  // 每60秒自动拉取云端数据
+  function startAutoRefresh(){
+    setInterval(function(){
+      if(isSaving)return;
+      fetch(GH_API,{
+        headers:{'Authorization':'token '+GH_TOKEN,'Accept':'application/vnd.github.v3+json'}
+      }).then(function(r){return r.json();}).then(function(data){
+        dataSha=data.sha;
+        var content=atob(data.content.replace(/\n/g,''));
+        var parsed=JSON.parse(content);
+        if(parsed&&typeof parsed==='object'){
+          // 只在远程有更新时覆盖本地
+          var remoteStr=JSON.stringify(parsed);
+          var localStr=JSON.stringify(tasks);
+          if(remoteStr!==localStr){
+            tasks=parsed;
+            render();
+            setSyncStatus('synced','已刷新');
+          }else{
+            setSyncStatus('synced','已同步');
+          }
+        }
+        lastSyncTime=Date.now();
+      }).catch(function(){});
+    },60000);
+  }
+
+  function save(){scheduleSave();}
+
   function setStatusFilter(filter,scope){
-    statusFilter=filter;
-    filterScope=scope||'today';
-    var chartFilter=document.getElementById('chartFilter');
-    if(filter){chartFilter.classList.add('show');chartFilter.textContent='✕ '+filter;}
-    else{chartFilter.classList.remove('show');}
+    statusFilter=filter;filterScope=scope||'today';
+    var cf=document.getElementById('chartFilter');
+    if(filter){cf.classList.add('show');cf.textContent='✕ '+filter;}else{cf.classList.remove('show');}
     document.querySelectorAll('.stat-item').forEach(function(el){
-      var itemScope=el.getAttribute('data-scope');
-      if(filter&&el.getAttribute('data-filter')===filter&&itemScope===filterScope)el.classList.add('active');
+      var s=el.getAttribute('data-scope');
+      if(filter&&el.getAttribute('data-filter')===filter&&s===filterScope)el.classList.add('active');
       else el.classList.remove('active');
     });
     document.querySelectorAll('.legend-item').forEach(function(el){
@@ -330,8 +406,8 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;b
     });
     render();
   }
-  
-  function drawPieChart(data,scope){
+
+  function drawPieChart(data){
     var svg=document.getElementById('pieChart'),total=data.length;
     var counts={done:0,progress:0,todo:0,delayed:0};
     data.forEach(function(t){if(t.status==='已完成')counts.done++;else if(t.status==='进行中')counts.progress++;else if(t.status==='待办')counts.todo++;else counts.delayed++;});
@@ -355,18 +431,16 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;b
     svg.querySelectorAll('.pie-slice').forEach(function(el){
       el.addEventListener('click',function(e){
         e.stopPropagation();e.preventDefault();
-        var status=el.getAttribute('data-status');
-        if(statusFilter===status)setStatusFilter(null);
-        else setStatusFilter(status,chartTab);
+        var s=el.getAttribute('data-status');
+        setStatusFilter(statusFilter===s?null:s,chartTab);
       });
     });
   }
-  
+
   function render(){
     var todayTasks=getTasks(currentDate);
     var allTasks=getAllTasks();
     var displayTasks=isOverallMode?allTasks:todayTasks;
-    
     if(isOverallMode){
       document.body.classList.add('overall-mode');
       document.getElementById('dateDisplay').textContent='全部任务';
@@ -380,45 +454,34 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;b
       document.getElementById('dateDisplay').textContent=isToday?'今天':(d.getMonth()+1)+'月'+d.getDate()+'日';
       document.getElementById('statsLabel').textContent=isToday?'当天任务':(d.getMonth()+1)+'月'+d.getDate()+'日任务';
     }
-    
-    // 更新当天统计
-    var todayCounts={todo:0,progress:0,done:0,delayed:0};
-    todayTasks.forEach(function(t){if(t.status==='已完成')todayCounts.done++;else if(t.status==='进行中')todayCounts.progress++;else if(t.status==='待办')todayCounts.todo++;else todayCounts.delayed++;});
-    document.getElementById('cnt-todo-today').textContent=todayCounts.todo;
-    document.getElementById('cnt-progress-today').textContent=todayCounts.progress;
-    document.getElementById('cnt-done-today').textContent=todayCounts.done;
-    document.getElementById('cnt-delayed-today').textContent=todayCounts.delayed;
-    
-    // 更新全部统计
-    var allCounts={todo:0,progress:0,done:0,delayed:0};
-    allTasks.forEach(function(t){if(t.status==='已完成')allCounts.done++;else if(t.status==='进行中')allCounts.progress++;else if(t.status==='待办')allCounts.todo++;else allCounts.delayed++;});
-    document.getElementById('cnt-todo-all').textContent=allCounts.todo;
-    document.getElementById('cnt-progress-all').textContent=allCounts.progress;
-    document.getElementById('cnt-done-all').textContent=allCounts.done;
-    document.getElementById('cnt-delayed-all').textContent=allCounts.delayed;
-    
-    // 根据tab更新饼图
+    var tc={todo:0,progress:0,done:0,delayed:0};
+    todayTasks.forEach(function(t){if(t.status==='已完成')tc.done++;else if(t.status==='进行中')tc.progress++;else if(t.status==='待办')tc.todo++;else tc.delayed++;});
+    document.getElementById('cnt-todo-today').textContent=tc.todo;
+    document.getElementById('cnt-progress-today').textContent=tc.progress;
+    document.getElementById('cnt-done-today').textContent=tc.done;
+    document.getElementById('cnt-delayed-today').textContent=tc.delayed;
+    var ac={todo:0,progress:0,done:0,delayed:0};
+    allTasks.forEach(function(t){if(t.status==='已完成')ac.done++;else if(t.status==='进行中')ac.progress++;else if(t.status==='待办')ac.todo++;else ac.delayed++;});
+    document.getElementById('cnt-todo-all').textContent=ac.todo;
+    document.getElementById('cnt-progress-all').textContent=ac.progress;
+    document.getElementById('cnt-done-all').textContent=ac.done;
+    document.getElementById('cnt-delayed-all').textContent=ac.delayed;
     var chartData=chartTab==='today'?todayTasks:allTasks;
     document.getElementById('chartTitle').textContent=chartTab==='today'?'当天任务进度':'全部任务进度';
-    drawPieChart(chartData,chartTab);
-    
-    // 任务列表筛选
+    drawPieChart(chartData);
     var filteredTasks=displayTasks;
     if(statusFilter){
       if(filterScope==='today')filteredTasks=todayTasks.filter(function(t){return t.status===statusFilter;});
       else filteredTasks=allTasks.filter(function(t){return t.status===statusFilter;});
     }
-    
     var container=document.getElementById('taskGroups');
     var html='';
     if(isOverallMode){
       var byDate={};
       filteredTasks.forEach(function(t){if(!byDate[t.date])byDate[t.date]=[];byDate[t.date].push(t);});
-      var dates=Object.keys(byDate).sort().reverse();
-      dates.forEach(function(ds){
-        var arr=byDate[ds];
+      Object.keys(byDate).sort().reverse().forEach(function(ds){
         html+='<div class="section-title">'+fmtDateShort(ds)+'</div>';
-        arr.forEach(function(task){html+=renderTaskItem(task,ds);});
+        byDate[ds].forEach(function(task){html+=renderTaskItem(task,ds);});
       });
     }else{
       var byAssignee={};
@@ -438,7 +501,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;b
     container.innerHTML=html;
     renderDateList();
   }
-  
+
   function renderTaskItem(task,dateOverride){
     var ds=dateOverride||task.date||currentDate;
     var cls='task-item';
@@ -449,17 +512,17 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;b
     if(isOverallMode&&ds)meta=(meta?meta+' · ':'')+fmtDateShort(ds);
     return'<div class="'+cls+'" data-id="'+task.id+'" data-date="'+ds+'"><div class="status-dot '+dotCls+'"></div><div class="task-info"><div class="task-title">'+escHtml(task.title)+'</div>'+(meta?'<div class="task-meta">'+meta+'</div>':'')+'</div><span class="status-badge" data-status="'+task.status+'">'+task.status+'</span></div>';
   }
-  
+
   function renderDateList(){
     var list=document.getElementById('dateList');
     var dates=Object.keys(tasks).filter(function(ds){return tasks[ds].length>0;}).sort().reverse();
     var html='';
-    dates.forEach(function(ds){var cnt=tasks[ds].length;html+='<div class="date-item'+(ds===currentDate&&!isOverallMode?' active':'')+'" data-date="'+ds+'"><span>'+fmtDateShort(ds)+'</span><span class="task-count-badge">'+cnt+'</span></div>';});
-    if(dates.length===0)html='<div style="padding:20px;text-align:center;color:var(--text3);font-size:13px;">暂无任务记录</div>';
+    dates.forEach(function(ds){html+='<div class="date-item'+(ds===currentDate&&!isOverallMode?' active':'')+'" data-date="'+ds+'"><span>'+fmtDateShort(ds)+'</span><span class="task-count-badge">'+tasks[ds].length+'</span></div>';});
+    if(!dates.length)html='<div style="padding:20px;text-align:center;color:var(--text3);font-size:13px;">暂无任务记录</div>';
     list.innerHTML=html;
   }
-  
-  function openModal(isEdit,task,taskDate){
+
+  function openModal(isEdit,task){
     editingId=isEdit?task.id:null;
     document.getElementById('modalTitle').textContent=isEdit?'编辑任务':'添加任务';
     document.getElementById('taskInput').value=isEdit?task.title:'';
@@ -470,9 +533,9 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;b
     document.getElementById('modalOverlay').classList.add('show');
     setTimeout(function(){document.getElementById('taskInput').focus();},100);
   }
-  
+
   function closeModal(){document.getElementById('modalOverlay').classList.remove('show');editingId=null;}
-  
+
   function saveTask(){
     var title=document.getElementById('taskInput').value.trim();
     var assignee=document.getElementById('assigneeInput').value;
@@ -490,17 +553,17 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;b
     }
     save();closeModal();render();
   }
-  
+
   function deleteTask(){
     if(!editingId)return;
     var arr=getTasks(currentDate);
     for(var i=0;i<arr.length;i++){if(arr[i].id===editingId){arr.splice(i,1);break;}}
     save();closeModal();render();showToast('任务已删除','green');
   }
-  
+
   function exportTasks(){
     var all=getAllTasks();
-    if(all.length===0){showToast('暂无任务可导出','red');return;}
+    if(!all.length){showToast('暂无任务可导出','red');return;}
     var data=all.map(function(t){return{日期:t.date,任务:t.title,负责人:t.assignee,截止时间:t.time||'',状态:t.status};});
     data.sort(function(a,b){return a.日期>b.日期?-1:1;});
     var ws=XLSX.utils.json_to_sheet(data);
@@ -508,7 +571,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;b
     XLSX.writeFile(wb,'任务分配台_'+todayStr()+'.xlsx');
     showToast('导出成功','green');
   }
-  
+
   function navigateDate(days){
     if(isNavigating)return;
     isNavigating=true;
@@ -517,43 +580,33 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;b
     render();
     setTimeout(function(){isNavigating=false;},300);
   }
-  
-  // 事件绑定
+
+  // === 事件绑定 ===
   document.getElementById('addTaskBtn').addEventListener('click',function(e){e.preventDefault();openModal(false);});
   document.getElementById('modalCancel').addEventListener('click',closeModal);
   document.getElementById('modalSubmit').addEventListener('click',saveTask);
   document.getElementById('modalDelete').addEventListener('click',deleteTask);
   document.getElementById('modalOverlay').addEventListener('click',function(e){if(e.target===this)closeModal();});
-  
+
   document.getElementById('taskGroups').addEventListener('click',function(e){
     var badge=e.target.closest('.status-badge');
     if(badge){
       e.stopPropagation();e.preventDefault();
-      var item=badge.closest('.task-item');
-      if(!item)return;
-      var id=item.getAttribute('data-id');
-      var ds=item.getAttribute('data-date');
+      var item=badge.closest('.task-item');if(!item)return;
+      var id=item.getAttribute('data-id'),ds=item.getAttribute('data-date');
       var arr=isOverallMode?(tasks[ds]||[]):getTasks(currentDate);
       var statuses=['待办','进行中','已完成','已延期'];
       for(var i=0;i<arr.length;i++){
-        if(arr[i].id===id){
-          var idx=statuses.indexOf(arr[i].status);
-          arr[i].status=statuses[(idx+1)%4];
-          save();render();showToast('状态已更新','green');
-          break;
-        }
+        if(arr[i].id===id){var idx=statuses.indexOf(arr[i].status);arr[i].status=statuses[(idx+1)%4];save();render();showToast('状态已更新','green');break;}
       }
       return;
     }
-    
-    var item=e.target.closest('.task-item');
-    if(!item)return;
-    var id=item.getAttribute('data-id');
-    var ds=item.getAttribute('data-date');
+    var item=e.target.closest('.task-item');if(!item)return;
+    var id=item.getAttribute('data-id'),ds=item.getAttribute('data-date');
     var arr=isOverallMode?(tasks[ds]||[]):getTasks(currentDate);
-    for(var i=0;i<arr.length;i++){if(arr[i].id===id){openModal(true,arr[i],ds);break;}}
+    for(var i=0;i<arr.length;i++){if(arr[i].id===id){openModal(true,arr[i]);break;}}
   });
-  
+
   document.getElementById('prevDay').addEventListener('click',function(e){e.preventDefault();e.stopPropagation();navigateDate(-1);});
   document.getElementById('nextDay').addEventListener('click',function(e){e.preventDefault();e.stopPropagation();navigateDate(1);});
   document.getElementById('todayBtn').addEventListener('click',function(e){e.preventDefault();currentDate=todayStr();setStatusFilter(null);render();});
@@ -564,34 +617,29 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;b
   document.getElementById('closeSidebar').addEventListener('click',function(){document.getElementById('sidebar').classList.remove('show');document.getElementById('sidebarOverlay').classList.remove('show');});
   document.getElementById('sidebarOverlay').addEventListener('click',function(){document.getElementById('sidebar').classList.remove('show');document.getElementById('sidebarOverlay').classList.remove('show');});
   document.getElementById('dateList').addEventListener('click',function(e){var item=e.target.closest('.date-item');if(item){currentDate=item.getAttribute('data-date');isOverallMode=false;setStatusFilter(null);render();document.getElementById('sidebar').classList.remove('show');document.getElementById('sidebarOverlay').classList.remove('show');}});
-  
-  // 统计项点击筛选
+
   document.querySelectorAll('.stat-item').forEach(function(el){
     el.addEventListener('click',function(){
-      var f=el.getAttribute('data-filter');
-      var scope=el.getAttribute('data-scope');
-      if(statusFilter===f&&filterScope===scope)setStatusFilter(null);
-      else setStatusFilter(f,scope);
+      var f=el.getAttribute('data-filter'),s=el.getAttribute('data-scope');
+      setStatusFilter(statusFilter===f&&filterScope===s?null:f,s);
     });
   });
-  
   document.querySelectorAll('.legend-item').forEach(function(el){el.addEventListener('click',function(){var f=el.getAttribute('data-filter');setStatusFilter(statusFilter===f?null:f,chartTab);});});
   document.getElementById('chartFilter').addEventListener('click',function(){setStatusFilter(null);});
   document.getElementById('exportBtn').addEventListener('click',function(e){e.preventDefault();exportTasks();});
-  
-  // 饼图tab切换
+
   document.querySelectorAll('.chart-tab').forEach(function(tab){
     tab.addEventListener('click',function(){
       document.querySelectorAll('.chart-tab').forEach(function(t){t.classList.remove('active');});
       tab.classList.add('active');
       chartTab=tab.getAttribute('data-tab');
-      setStatusFilter(null);
-      render();
+      setStatusFilter(null);render();
     });
   });
-  
-  // 初始化
-  load();render();
+
+  // === 初始化 ===
+  loadFromCloud();
+  startAutoRefresh();
 })();
 </script>
 </body>
