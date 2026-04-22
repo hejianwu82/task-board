@@ -1,0 +1,370 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>任务分配台</title>
+<script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;}
+:root{
+  --bg:#0c0c0e;--surface:#141416;--surface2:#1c1c1f;--surface3:#242428;
+  --border:#2a2a2f;--text:#e8e8ec;--text2:#9898a4;--text3:#5a5a66;
+  --accent:#f59e0b;--accent2:#fbbf24;--accent-glow:rgba(245,158,11,0.15);
+  --green:#22c55e;--green-bg:rgba(34,197,94,0.12);
+  --yellow:#eab308;--yellow-bg:rgba(234,179,8,0.12);
+  --red:#ef4444;--red-bg:rgba(239,68,68,0.12);
+  --blue:#3b82f6;--blue-bg:rgba(59,130,246,0.12);
+  --purple:#a855f7;--purple-bg:rgba(168,85,247,0.12);
+}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:var(--bg);color:var(--text);min-height:100vh;}
+
+/* HEADER */
+.header{background:var(--surface);border-bottom:1px solid var(--border);padding:12px 16px;position:sticky;top:0;z-index:50;}
+.header-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;}
+.logo{font-size:16px;font-weight:700;display:flex;align-items:center;gap:8px;}
+.logo-icon{width:28px;height:28px;background:var(--accent);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:14px;}
+.header-actions{display:flex;gap:8px;}
+.menu-btn,.export-btn{width:36px;height:36px;border-radius:8px;border:1px solid var(--border);background:var(--surface2);color:var(--text2);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:14px;}
+.export-btn{width:auto;padding:0 12px;font-size:12px;font-weight:500;gap:4px;}
+.export-btn:hover{border-color:var(--accent);color:var(--accent);}
+
+/* DATE NAV */
+.date-nav{display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
+.date-display{font-size:14px;font-weight:600;padding:4px 0;}
+.nav-btn{width:32px;height:32px;border-radius:8px;border:1px solid var(--border);background:var(--surface2);color:var(--text2);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:14px;}
+.nav-btn.today-btn{width:auto;padding:0 10px;font-size:12px;font-weight:500;}
+.nav-btn.overall-btn{width:auto;padding:0 12px;font-size:12px;font-weight:500;background:var(--purple-bg);border-color:rgba(168,85,247,0.3);color:var(--purple);}
+.nav-btn.overall-btn.active{background:var(--purple);color:#fff;}
+.date-input{position:absolute;opacity:0;pointer-events:none;}
+.date-picker-trigger{width:32px;height:32px;border-radius:8px;border:1px solid var(--border);background:var(--surface2);color:var(--text2);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:14px;}
+
+/* OVERALL MODE STYLES */
+.overall-mode .date-nav .nav-btn:not(.overall-btn):not(.today-btn){opacity:0.4;pointer-events:none;}
+.overall-mode .stats-bar{background:linear-gradient(135deg,rgba(168,85,247,0.08),rgba(59,130,246,0.08));}
+.overall-mode .date-display{color:var(--purple);}
+
+/* SIDEBAR OVERLAY */
+.sidebar-overlay{position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:100;opacity:0;pointer-events:none;transition:opacity .2s;}
+.sidebar-overlay.show{opacity:1;pointer-events:all;}
+.sidebar{position:fixed;left:0;top:0;bottom:0;width:260px;background:var(--surface);border-right:1px solid var(--border);z-index:101;transform:translateX(-100%);transition:transform .2s;overflow-y:auto;}
+.sidebar.show{transform:translateX(0);}
+.sidebar-header{padding:16px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;}
+.sidebar-title{font-size:14px;font-weight:600;}
+.close-btn{width:32px;height:32px;border-radius:8px;border:none;background:var(--surface2);color:var(--text2);cursor:pointer;font-size:18px;}
+.date-list{padding:8px;display:flex;flex-direction:column;gap:2px;}
+.date-item{display:flex;align-items:center;justify-content:space-between;padding:10px 12px;border-radius:8px;cursor:pointer;font-size:14px;color:var(--text2);transition:all .15s;}
+.date-item:hover,.date-item:active{background:var(--surface2);color:var(--text);}
+.date-item.active{background:var(--accent-glow);color:var(--accent);font-weight:600;}
+.task-count-badge{font-size:11px;font-family:monospace;background:var(--surface3);color:var(--text3);padding:2px 8px;border-radius:10px;}
+.date-item.active .task-count-badge{background:rgba(245,158,11,.25);color:var(--accent);}
+
+/* STATS BAR */
+.stats-bar{background:var(--surface);border-bottom:1px solid var(--border);padding:12px 16px;display:grid;grid-template-columns:repeat(4,1fr);gap:8px;}
+.stat-item{text-align:center;cursor:pointer;padding:8px 4px;border-radius:10px;transition:all .15s;}
+.stat-item:hover{background:var(--surface2);}
+.stat-item.active{background:var(--accent-glow);}
+.stat-item.active .stat-value{color:var(--accent);}
+.stat-label{font-size:10px;color:var(--text3);margin-bottom:2px;}
+.stat-value{font-size:18px;font-weight:700;font-family:monospace;}
+.stat-item.todo .stat-value{color:var(--text2);}
+.stat-item.progress .stat-value{color:var(--yellow);}
+.stat-item.done .stat-value{color:var(--green);}
+.stat-item.delayed .stat-value{color:var(--red);}
+
+/* PIE CHART SECTION */
+.chart-section{background:var(--surface);border-bottom:1px solid var(--border);padding:16px;}
+.chart-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;}
+.chart-title{font-size:13px;font-weight:600;color:var(--text2);}
+.chart-filter{font-size:11px;color:var(--accent);cursor:pointer;padding:4px 10px;border-radius:6px;background:var(--accent-glow);display:none;}
+.chart-filter.show{display:inline-block;}
+.pie-wrap{display:flex;align-items:center;gap:20px;}
+.pie-svg{width:100px;height:100px;flex-shrink:0;cursor:pointer;}
+.pie-svg .pie-slice{cursor:pointer;transition:opacity .15s;}
+.pie-svg .pie-slice:hover{opacity:.7;}
+.pie-legend{display:grid;grid-template-columns:1fr 1fr;gap:8px;flex:1;}
+.legend-item{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text2);cursor:pointer;padding:4px 6px;border-radius:6px;transition:all .15s;}
+.legend-item:hover{background:var(--surface2);}
+.legend-item.active{background:var(--accent-glow);color:var(--accent);}
+.legend-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0;}
+.legend-val{font-weight:600;font-family:monospace;margin-left:auto;}
+
+/* TASK LIST */
+.task-list{padding:16px;}
+.add-task-btn{display:flex;align-items:center;justify-content:center;gap:8px;padding:12px;background:var(--accent-glow);border:1px dashed rgba(245,158,11,.4);border-radius:10px;color:var(--accent);font-size:14px;font-weight:600;cursor:pointer;width:100%;margin-bottom:16px;}
+.add-task-btn:active{background:rgba(245,158,11,.2);border-color:var(--accent);}
+.overall-mode .add-task-btn{display:none;}
+
+.task-group{margin-bottom:24px;}
+.task-group-header{display:flex;align-items:center;gap:8px;margin-bottom:8px;padding-bottom:6px;border-bottom:1px solid var(--border);}
+.assignee-avatar{width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;color:#fff;}
+.assignee-name{font-size:13px;font-weight:600;}
+.group-progress{font-size:11px;font-family:monospace;color:var(--text3);margin-left:auto;}
+.group-progress .done{color:var(--green);}
+
+.task-item{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:12px;margin-bottom:8px;display:flex;align-items:center;gap:10px;cursor:pointer;transition:all .15s;}
+.task-item:active{background:var(--surface2);transform:scale(.98);}
+.task-item.done-task{opacity:.5;}
+.task-item.done-task .task-title{text-decoration:line-through;color:var(--text3);}
+.task-item.delayed-task{border-color:rgba(239,68,68,.3);background:rgba(239,68,68,.04);}
+.task-item.highlighted{border-color:var(--accent);background:var(--accent-glow);}
+
+.status-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0;}
+.status-todo{background:var(--surface3);border:2px solid var(--text3);}
+.status-progress{background:var(--yellow);}
+.status-done{background:var(--green);}
+.status-delayed{background:var(--red);}
+
+.task-info{flex:1;min-width:0;}
+.task-title{font-size:14px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.task-meta{font-size:11px;color:var(--text3);margin-top:2px;display:flex;gap:8px;}
+.task-date{color:var(--purple);}
+
+.status-badge{font-size:11px;font-weight:600;padding:4px 10px;border-radius:10px;cursor:pointer;white-space:nowrap;border:1px solid transparent;}
+.status-badge[data-status="待办"]{background:var(--surface3);color:var(--text3);}
+.status-badge[data-status="进行中"]{background:var(--yellow-bg);color:var(--yellow);}
+.status-badge[data-status="已完成"]{background:var(--green-bg);color:var(--green);}
+.status-badge[data-status="已延期"]{background:var(--red-bg);color:var(--red);}
+
+.empty-state{text-align:center;padding:40px 20px;color:var(--text3);}
+.empty-icon{font-size:48px;margin-bottom:12px;opacity:.3;}
+
+/* SECTION TITLE for overall mode */
+.section-title{font-size:13px;font-weight:600;color:var(--text2);padding:12px 0 8px;border-top:1px solid var(--border);margin-top:8px;}
+.section-title:first-child{border-top:none;margin-top:0;padding-top:0;}
+
+/* MODAL */
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:200;display:flex;align-items:flex-end;justify-content:center;opacity:0;pointer-events:none;transition:opacity .2s;}
+.modal-overlay.show{opacity:1;pointer-events:all;}
+.modal{background:var(--surface);border-radius:20px 20px 0 0;width:100%;max-width:500px;padding:20px;max-height:90vh;overflow-y:auto;transform:translateY(100%);transition:transform .2s;}
+.modal-overlay.show .modal{transform:translateY(0);}
+.modal-handle{width:40px;height:4px;background:var(--border);border-radius:2px;margin:0 auto 16px;}
+.modal-title{font-size:16px;font-weight:700;margin-bottom:16px;}
+.form-group{margin-bottom:14px;}
+.form-label{display:block;font-size:11px;font-weight:600;color:var(--text3);margin-bottom:6px;}
+.form-input,.form-select{width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:12px;color:var(--text);font-size:14px;outline:none;}
+.form-input:focus,.form-select:focus{border-color:var(--accent);}
+.form-select{cursor:pointer;appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%235a5a66' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 12px center;padding-right:36px;}
+.modal-actions{display:flex;gap:10px;margin-top:20px;}
+.btn{flex:1;padding:12px;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;border:none;}
+.btn-cancel{background:var(--surface3);color:var(--text2);}
+.btn-submit{background:var(--accent);color:#000;}
+.btn-delete{background:var(--red-bg);color:var(--red);}
+
+/* TOAST */
+.toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%) translateY(20px);background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:10px 20px;font-size:13px;z-index:300;opacity:0;transition:all .3s;pointer-events:none;}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+.toast.green{border-color:rgba(34,197,94,.4);color:var(--green);}
+.toast.red{border-color:rgba(239,68,68,.4);color:var(--red);}
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<div class="header">
+  <div class="header-top">
+    <div class="logo"><div class="logo-icon">📋</div>任务分配台</div>
+    <div class="header-actions">
+      <button class="export-btn" id="exportBtn">📥 导出</button>
+      <button class="menu-btn" id="menuBtn">☰</button>
+    </div>
+  </div>
+  <div class="date-nav">
+    <button class="nav-btn overall-btn" id="overallBtn">整体</button>
+    <button class="nav-btn" id="prevDay">‹</button>
+    <div class="date-display" id="dateDisplay">今天</div>
+    <button class="nav-btn" id="nextDay">›</button>
+    <button class="nav-btn today-btn" id="todayBtn">今天</button>
+    <input type="date" class="date-input" id="datePicker">
+    <button class="date-picker-trigger" id="datePickerBtn">📅</button>
+  </div>
+</div>
+
+<!-- SIDEBAR -->
+<div class="sidebar-overlay" id="sidebarOverlay"></div>
+<div class="sidebar" id="sidebar">
+  <div class="sidebar-header">
+    <span class="sidebar-title">选择日期</span>
+    <button class="close-btn" id="closeSidebar">×</button>
+  </div>
+  <div class="date-list" id="dateList"></div>
+</div>
+
+<!-- STATS BAR -->
+<div class="stats-bar">
+  <div class="stat-item todo" data-filter="待办"><div class="stat-label">待办</div><div class="stat-value" id="cnt-todo">0</div></div>
+  <div class="stat-item progress" data-filter="进行中"><div class="stat-label">进行中</div><div class="stat-value" id="cnt-progress">0</div></div>
+  <div class="stat-item done" data-filter="已完成"><div class="stat-label">已完成</div><div class="stat-value" id="cnt-done">0</div></div>
+  <div class="stat-item delayed" data-filter="已延期"><div class="stat-label">已延期</div><div class="stat-value" id="cnt-delayed">0</div></div>
+</div>
+
+<!-- PIE CHART -->
+<div class="chart-section">
+  <div class="chart-header">
+    <span class="chart-title">📊 任务进度图 <span id="totalInfo">(点击查看明细)</span></span>
+    <span class="chart-filter" id="chartFilter">✕ 清除筛选</span>
+  </div>
+  <div class="pie-wrap">
+    <svg class="pie-svg" viewBox="0 0 100 100" id="pieChart"></svg>
+    <div class="pie-legend">
+      <div class="legend-item" data-filter="已完成"><div class="legend-dot" style="background:#22c55e"></div><span>已完成</span><span class="legend-val" id="leg-done">0</span></div>
+      <div class="legend-item" data-filter="进行中"><div class="legend-dot" style="background:#eab308"></div><span>进行中</span><span class="legend-val" id="leg-progress">0</span></div>
+      <div class="legend-item" data-filter="待办"><div class="legend-dot" style="background:#5a5a66"></div><span>待办</span><span class="legend-val" id="leg-todo">0</span></div>
+      <div class="legend-item" data-filter="已延期"><div class="legend-dot" style="background:#ef4444"></div><span>已延期</span><span class="legend-val" id="leg-delayed">0</span></div>
+    </div>
+  </div>
+</div>
+
+<!-- TASK LIST -->
+<div class="task-list">
+  <button class="add-task-btn" id="addTaskBtn">＋ 添加新任务</button>
+  <div id="taskGroups"></div>
+</div>
+
+<!-- MODAL -->
+<div class="modal-overlay" id="modalOverlay">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div class="modal-title" id="modalTitle">添加任务</div>
+    <div class="form-group">
+      <label class="form-label">任务内容</label>
+      <input class="form-input" id="taskInput" placeholder="输入任务内容…" maxlength="200">
+    </div>
+    <div class="form-group">
+      <label class="form-label">负责人</label>
+      <select class="form-select" id="assigneeInput"><option value="">选择负责人…</option></select>
+    </div>
+    <div class="form-group">
+      <label class="form-label">截止时间</label>
+      <input type="time" class="form-input" id="timeInput" value="18:00">
+    </div>
+    <div class="form-group">
+      <label class="form-label">状态</label>
+      <select class="form-select" id="statusInput">
+        <option value="待办">待办</option>
+        <option value="进行中">进行中</option>
+        <option value="已完成">已完成</option>
+        <option value="已延期">已延期</option>
+      </select>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-delete" id="modalDelete" style="display:none;">删除</button>
+      <button class="btn btn-cancel" id="modalCancel">取消</button>
+      <button class="btn btn-submit" id="modalSubmit">保存</button>
+    </div>
+  </div>
+</div>
+
+<!-- TOAST -->
+<div class="toast" id="toast"></div>
+
+<script>
+var MEMBERS=[{name:'何建武',color:'#f59e0b'},{name:'陈新泉',color:'#3b82f6'},{name:'林焕伟',color:'#22c55e'}];
+var currentDate=todayStr();
+var tasks={};
+var editingId=null;
+var statusFilter=null;
+var isOverallMode=false;
+
+function todayStr(){return new Date().toISOString().slice(0,10);}
+function yesterdayStr(){var d=new Date();d.setDate(d.getDate()-1);return d.toISOString().slice(0,10);}
+function fmtDateShort(ds){
+  var d=new Date(ds+'T00:00:00'),t=new Date(),tom=new Date(t),yes=new Date(t);
+  tom.setDate(t.getDate()+1);yes.setDate(t.getDate()-1);
+  if(ds===todayStr())return'今天';
+  if(ds===tom.toISOString().slice(0,10))return'明天';
+  if(ds===yes.toISOString().slice(0,10))return'昨天';
+  var wd=['周日','周一','周二','周三','周四','周五','周六'];
+  return(d.getMonth()+1)+'/'+d.getDate()+' '+wd[d.getDay()];
+}
+function getTasks(ds){if(!tasks[ds])tasks[ds]=[];return tasks[ds];}
+function getAllTasks(){
+  var all=[];
+  Object.keys(tasks).forEach(function(ds){
+    tasks[ds].forEach(function(t){
+      all.push(Object.assign({},t,{date:ds}));
+    });
+  });
+  return all;
+}
+function save(){try{localStorage.setItem('tb_v5',JSON.stringify(tasks));}catch(e){}}
+function load(){try{var raw=localStorage.getItem('tb_v5');if(raw)tasks=JSON.parse(raw);}catch(e){tasks={};}}
+function escHtml(s){var d=document.createElement('div');d.textContent=s;return d.innerHTML;}
+function showToast(msg,type){var t=document.getElementById('toast');t.textContent=msg;t.className='toast'+(type?' '+type:'');t.classList.add('show');setTimeout(function(){t.classList.remove('show');},2000);}
+
+function setStatusFilter(filter){
+  statusFilter=filter;
+  var chartFilter=document.getElementById('chartFilter');
+  if(filter){
+    chartFilter.classList.add('show');
+    chartFilter.textContent='✕ '+filter;
+  }else{
+    chartFilter.classList.remove('show');
+  }
+  document.querySelectorAll('.stat-item').forEach(function(el){
+    if(filter&&el.getAttribute('data-filter')===filter)el.classList.add('active');
+    else el.classList.remove('active');
+  });
+  document.querySelectorAll('.legend-item').forEach(function(el){
+    if(filter&&el.getAttribute('data-filter')===filter)el.classList.add('active');
+    else el.classList.remove('active');
+  });
+  render();
+}
+
+function drawPieChart(data){
+  var svg=document.getElementById('pieChart'),total=data.length;
+  var counts={done:0,progress:0,todo:0,delayed:0};
+  data.forEach(function(t){
+    if(t.status==='已完成')counts.done++;
+    else if(t.status==='进行中')counts.progress++;
+    else if(t.status==='待办')counts.todo++;
+    else counts.delayed++;
+  });
+  document.getElementById('leg-done').textContent=counts.done;
+  document.getElementById('leg-progress').textContent=counts.progress;
+  document.getElementById('leg-todo').textContent=counts.todo;
+  document.getElementById('leg-delayed').textContent=counts.delayed;
+  document.getElementById('totalInfo').textContent=total>0?'(点击查看明细)':'';
+  if(total===0){
+    svg.innerHTML='<circle cx="50" cy="50" r="40" fill="none" stroke="#242428" stroke-width="20"/>';
+    return;
+  }
+  var colors={done:'#22c55e',progress:'#eab308',todo:'#5a5a66',delayed:'#ef4444'};
+  var statusMap={done:'已完成',progress:'进行中',todo:'待办',delayed:'已延期'};
+  var order=['done','progress','todo','delayed'];
+  var R=40,C=2*Math.PI*R,offset=25;
+  var html='';
+  order.forEach(function(key){
+    var count=counts[key];if(count===0)return;
+    var pct=count/total,dashLen=pct*C;
+    html+='<circle class="pie-slice" data-status="'+statusMap[key]+'" cx="50" cy="50" r="40" fill="none" stroke="'+colors[key]+'" stroke-width="20" stroke-dasharray="'+dashLen+' '+(C-dashLen)+'" stroke-dashoffset="'+(-(offset*C/100))+'"/>';
+    offset+=pct*100;
+  });
+  svg.innerHTML='<circle cx="50" cy="50" r="40" fill="none" stroke="#242428" stroke-width="20"/>'+html;
+
+  svg.querySelectorAll('.pie-slice').forEach(function(el){
+    el.addEventListener('click',function(e){
+      e.stopPropagation();
+      var status=el.getAttribute('data-status');
+      if(statusFilter===status)setStatusFilter(null);
+      else setStatusFilter(status);
+    });
+  });
+}
+
+function render(){
+  var todTasks=isOverallMode?getAllTasks():getTasks(currentDate);
+  if(isOverallMode){
+    document.body.classList.add('overall-mode');
+    document.getElementById('dateDisplay').textContent='全部任务';
+    document.getElementById('overallBtn').classList.add('active');
+  }else{
+    document.body.classList.remove('overall-mode');
+    document.getElementById('overallBtn').classList.remove('active');
+    var isToday=currentDate===todayStr();
+    var d=new Date(currentDate+'T00:00:00');
+    document.getElementById('dateDisplay').textContent=isToday?'今天':(d.getMonth()+1)+'月'+d.getDate()+'日';
+  }
+
+  var filteredTasks=statusFilter?todTasks.filter(function
