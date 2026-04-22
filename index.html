@@ -52,7 +52,9 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;b
 .date-item.active{background:var(--accent-glow);color:var(--accent);font-weight:600;}
 .task-count-badge{font-size:11px;font-family:monospace;background:var(--surface3);color:var(--text3);padding:2px 8px;border-radius:10px;}
 .date-item.active .task-count-badge{background:rgba(245,158,11,.25);color:var(--accent);}
-.stats-bar{background:var(--surface);border-bottom:1px solid var(--border);padding:12px 16px;display:grid;grid-template-columns:repeat(4,1fr);gap:8px;}
+.stats-bar{background:var(--surface);border-bottom:1px solid var(--border);padding:12px 16px;}
+.stats-row{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;}
+.stats-label{font-size:10px;color:var(--text3);text-align:center;margin-bottom:4px;}
 .stat-item{text-align:center;cursor:pointer;padding:8px 4px;border-radius:10px;transition:all .15s;}
 .stat-item:hover{background:var(--surface2);}
 .stat-item.active{background:var(--accent-glow);}
@@ -64,6 +66,9 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;b
 .stat-item.done .stat-value{color:var(--green);}
 .stat-item.delayed .stat-value{color:var(--red);}
 .chart-section{background:var(--surface);border-bottom:1px solid var(--border);padding:16px;}
+.chart-tabs{display:flex;gap:8px;margin-bottom:12px;}
+.chart-tab{flex:1;padding:8px 12px;border-radius:8px;border:1px solid var(--border);background:var(--surface2);color:var(--text2);font-size:13px;font-weight:600;cursor:pointer;text-align:center;transition:all .15s;}
+.chart-tab.active{background:var(--accent);color:#000;border-color:var(--accent);}
 .chart-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;}
 .chart-title{font-size:13px;font-weight:600;color:var(--text2);}
 .chart-filter{font-size:11px;color:var(--accent);cursor:pointer;padding:4px 10px;border-radius:6px;background:var(--accent-glow);display:none;}
@@ -163,14 +168,28 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;b
   <div class="date-list" id="dateList"></div>
 </div>
 <div class="stats-bar">
-  <div class="stat-item todo" data-filter="待办"><div class="stat-label">待办</div><div class="stat-value" id="cnt-todo">0</div></div>
-  <div class="stat-item progress" data-filter="进行中"><div class="stat-label">进行中</div><div class="stat-value" id="cnt-progress">0</div></div>
-  <div class="stat-item done" data-filter="已完成"><div class="stat-label">已完成</div><div class="stat-value" id="cnt-done">0</div></div>
-  <div class="stat-item delayed" data-filter="已延期"><div class="stat-label">已延期</div><div class="stat-value" id="cnt-delayed">0</div></div>
+  <div class="stats-label" id="statsLabel">当天任务</div>
+  <div class="stats-row" id="statsToday">
+    <div class="stat-item todo" data-filter="待办" data-scope="today"><div class="stat-label">待办</div><div class="stat-value" id="cnt-todo-today">0</div></div>
+    <div class="stat-item progress" data-filter="进行中" data-scope="today"><div class="stat-label">进行中</div><div class="stat-value" id="cnt-progress-today">0</div></div>
+    <div class="stat-item done" data-filter="已完成" data-scope="today"><div class="stat-label">已完成</div><div class="stat-value" id="cnt-done-today">0</div></div>
+    <div class="stat-item delayed" data-filter="已延期" data-scope="today"><div class="stat-label">已延期</div><div class="stat-value" id="cnt-delayed-today">0</div></div>
+  </div>
+  <div class="stats-label" style="margin-top:12px;">全部任务</div>
+  <div class="stats-row" id="statsAll">
+    <div class="stat-item todo" data-filter="待办" data-scope="all"><div class="stat-label">待办</div><div class="stat-value" id="cnt-todo-all">0</div></div>
+    <div class="stat-item progress" data-filter="进行中" data-scope="all"><div class="stat-label">进行中</div><div class="stat-value" id="cnt-progress-all">0</div></div>
+    <div class="stat-item done" data-filter="已完成" data-scope="all"><div class="stat-label">已完成</div><div class="stat-value" id="cnt-done-all">0</div></div>
+    <div class="stat-item delayed" data-filter="已延期" data-scope="all"><div class="stat-label">已延期</div><div class="stat-value" id="cnt-delayed-all">0</div></div>
+  </div>
 </div>
 <div class="chart-section">
+  <div class="chart-tabs">
+    <div class="chart-tab active" data-tab="today">📅 当天任务</div>
+    <div class="chart-tab" data-tab="all">📊 全部任务</div>
+  </div>
   <div class="chart-header">
-    <span class="chart-title">📊 任务进度图 <span id="totalInfo">(点击查看明细)</span></span>
+    <span class="chart-title" id="chartTitle">当天任务进度</span>
     <span class="chart-filter" id="chartFilter">✕ 清除筛选</span>
   </div>
   <div class="pie-wrap">
@@ -228,6 +247,8 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;b
   var tasks={};
   var editingId=null;
   var statusFilter=null;
+  var filterScope='today';
+  var chartTab='today';
   var isOverallMode=false;
   var isNavigating=false;
 
@@ -282,7 +303,6 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;b
       var raw=localStorage.getItem('tb_v6');
       if(raw){tasks=JSON.parse(raw);}
       else{
-        // 尝试从旧版本迁移数据
         var old=localStorage.getItem('tb_v5');
         if(old){tasks=JSON.parse(old);save();localStorage.removeItem('tb_v5');}
       }
@@ -293,17 +313,25 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;b
   
   function showToast(msg,type){var t=document.getElementById('toast');t.textContent=msg;t.className='toast'+(type?' '+type:'');t.classList.add('show');setTimeout(function(){t.classList.remove('show');},2000);}
   
-  function setStatusFilter(filter){
+  function setStatusFilter(filter,scope){
     statusFilter=filter;
+    filterScope=scope||'today';
     var chartFilter=document.getElementById('chartFilter');
     if(filter){chartFilter.classList.add('show');chartFilter.textContent='✕ '+filter;}
     else{chartFilter.classList.remove('show');}
-    document.querySelectorAll('.stat-item').forEach(function(el){if(filter&&el.getAttribute('data-filter')===filter)el.classList.add('active');else el.classList.remove('active');});
-    document.querySelectorAll('.legend-item').forEach(function(el){if(filter&&el.getAttribute('data-filter')===filter)el.classList.add('active');else el.classList.remove('active');});
+    document.querySelectorAll('.stat-item').forEach(function(el){
+      var itemScope=el.getAttribute('data-scope');
+      if(filter&&el.getAttribute('data-filter')===filter&&itemScope===filterScope)el.classList.add('active');
+      else el.classList.remove('active');
+    });
+    document.querySelectorAll('.legend-item').forEach(function(el){
+      if(filter&&el.getAttribute('data-filter')===filter)el.classList.add('active');
+      else el.classList.remove('active');
+    });
     render();
   }
   
-  function drawPieChart(data){
+  function drawPieChart(data,scope){
     var svg=document.getElementById('pieChart'),total=data.length;
     var counts={done:0,progress:0,todo:0,delayed:0};
     data.forEach(function(t){if(t.status==='已完成')counts.done++;else if(t.status==='进行中')counts.progress++;else if(t.status==='待办')counts.todo++;else counts.delayed++;});
@@ -311,8 +339,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;b
     document.getElementById('leg-progress').textContent=counts.progress;
     document.getElementById('leg-todo').textContent=counts.todo;
     document.getElementById('leg-delayed').textContent=counts.delayed;
-    document.getElementById('totalInfo').textContent=total>0?'(点击查看明细)':'';
-    if(total===0){svg.innerHTML='<circle cx="50" cy="50" r="40" fill="none" stroke="#242428" stroke-width="20"/>';return;}
+    if(total===0){svg.innerHTML='<circle cx="50" cy="50" r="40" fill="none" stroke="#242428" stroke-width="20"/><text x="50" y="50" text-anchor="middle" dy=".35em" fill="#5a5a66" font-size="11">暂无</text>';return;}
     var colors={done:'#22c55e',progress:'#eab308',todo:'#5a5a66',delayed:'#ef4444'};
     var statusMap={done:'已完成',progress:'进行中',todo:'待办',delayed:'已延期'};
     var order=['done','progress','todo','delayed'];
@@ -325,30 +352,63 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;b
       offset+=pct*100;
     });
     svg.innerHTML='<circle cx="50" cy="50" r="40" fill="none" stroke="#242428" stroke-width="20"/>'+html;
-    svg.querySelectorAll('.pie-slice').forEach(function(el){el.addEventListener('click',function(e){e.stopPropagation();e.preventDefault();var status=el.getAttribute('data-status');if(statusFilter===status)setStatusFilter(null);else setStatusFilter(status);});});
+    svg.querySelectorAll('.pie-slice').forEach(function(el){
+      el.addEventListener('click',function(e){
+        e.stopPropagation();e.preventDefault();
+        var status=el.getAttribute('data-status');
+        if(statusFilter===status)setStatusFilter(null);
+        else setStatusFilter(status,chartTab);
+      });
+    });
   }
   
   function render(){
-    var todTasks=isOverallMode?getAllTasks():getTasks(currentDate);
+    var todayTasks=getTasks(currentDate);
+    var allTasks=getAllTasks();
+    var displayTasks=isOverallMode?allTasks:todayTasks;
+    
     if(isOverallMode){
       document.body.classList.add('overall-mode');
       document.getElementById('dateDisplay').textContent='全部任务';
       document.getElementById('overallBtn').classList.add('active');
+      document.getElementById('statsLabel').textContent='当天任务 ('+fmtDateShort(currentDate)+')';
     }else{
       document.body.classList.remove('overall-mode');
       document.getElementById('overallBtn').classList.remove('active');
       var isToday=currentDate===todayStr();
       var d=new Date(currentDate);
       document.getElementById('dateDisplay').textContent=isToday?'今天':(d.getMonth()+1)+'月'+d.getDate()+'日';
+      document.getElementById('statsLabel').textContent=isToday?'当天任务':(d.getMonth()+1)+'月'+d.getDate()+'日任务';
     }
-    var filteredTasks=statusFilter?todTasks.filter(function(t){return t.status===statusFilter;}):todTasks;
-    var counts={todo:0,progress:0,done:0,delayed:0};
-    todTasks.forEach(function(t){if(t.status==='已完成')counts.done++;else if(t.status==='进行中')counts.progress++;else if(t.status==='待办')counts.todo++;else counts.delayed++;});
-    document.getElementById('cnt-todo').textContent=counts.todo;
-    document.getElementById('cnt-progress').textContent=counts.progress;
-    document.getElementById('cnt-done').textContent=counts.done;
-    document.getElementById('cnt-delayed').textContent=counts.delayed;
-    drawPieChart(todTasks);
+    
+    // 更新当天统计
+    var todayCounts={todo:0,progress:0,done:0,delayed:0};
+    todayTasks.forEach(function(t){if(t.status==='已完成')todayCounts.done++;else if(t.status==='进行中')todayCounts.progress++;else if(t.status==='待办')todayCounts.todo++;else todayCounts.delayed++;});
+    document.getElementById('cnt-todo-today').textContent=todayCounts.todo;
+    document.getElementById('cnt-progress-today').textContent=todayCounts.progress;
+    document.getElementById('cnt-done-today').textContent=todayCounts.done;
+    document.getElementById('cnt-delayed-today').textContent=todayCounts.delayed;
+    
+    // 更新全部统计
+    var allCounts={todo:0,progress:0,done:0,delayed:0};
+    allTasks.forEach(function(t){if(t.status==='已完成')allCounts.done++;else if(t.status==='进行中')allCounts.progress++;else if(t.status==='待办')allCounts.todo++;else allCounts.delayed++;});
+    document.getElementById('cnt-todo-all').textContent=allCounts.todo;
+    document.getElementById('cnt-progress-all').textContent=allCounts.progress;
+    document.getElementById('cnt-done-all').textContent=allCounts.done;
+    document.getElementById('cnt-delayed-all').textContent=allCounts.delayed;
+    
+    // 根据tab更新饼图
+    var chartData=chartTab==='today'?todayTasks:allTasks;
+    document.getElementById('chartTitle').textContent=chartTab==='today'?'当天任务进度':'全部任务进度';
+    drawPieChart(chartData,chartTab);
+    
+    // 任务列表筛选
+    var filteredTasks=displayTasks;
+    if(statusFilter){
+      if(filterScope==='today')filteredTasks=todayTasks.filter(function(t){return t.status===statusFilter;});
+      else filteredTasks=allTasks.filter(function(t){return t.status===statusFilter;});
+    }
+    
     var container=document.getElementById('taskGroups');
     var html='';
     if(isOverallMode){
@@ -468,8 +528,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;b
   document.getElementById('taskGroups').addEventListener('click',function(e){
     var badge=e.target.closest('.status-badge');
     if(badge){
-      e.stopPropagation();
-      e.preventDefault();
+      e.stopPropagation();e.preventDefault();
       var item=badge.closest('.task-item');
       if(!item)return;
       var id=item.getAttribute('data-id');
@@ -505,10 +564,31 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;b
   document.getElementById('closeSidebar').addEventListener('click',function(){document.getElementById('sidebar').classList.remove('show');document.getElementById('sidebarOverlay').classList.remove('show');});
   document.getElementById('sidebarOverlay').addEventListener('click',function(){document.getElementById('sidebar').classList.remove('show');document.getElementById('sidebarOverlay').classList.remove('show');});
   document.getElementById('dateList').addEventListener('click',function(e){var item=e.target.closest('.date-item');if(item){currentDate=item.getAttribute('data-date');isOverallMode=false;setStatusFilter(null);render();document.getElementById('sidebar').classList.remove('show');document.getElementById('sidebarOverlay').classList.remove('show');}});
-  document.querySelectorAll('.stat-item').forEach(function(el){el.addEventListener('click',function(){var f=el.getAttribute('data-filter');setStatusFilter(statusFilter===f?null:f);});});
-  document.querySelectorAll('.legend-item').forEach(function(el){el.addEventListener('click',function(){var f=el.getAttribute('data-filter');setStatusFilter(statusFilter===f?null:f);});});
+  
+  // 统计项点击筛选
+  document.querySelectorAll('.stat-item').forEach(function(el){
+    el.addEventListener('click',function(){
+      var f=el.getAttribute('data-filter');
+      var scope=el.getAttribute('data-scope');
+      if(statusFilter===f&&filterScope===scope)setStatusFilter(null);
+      else setStatusFilter(f,scope);
+    });
+  });
+  
+  document.querySelectorAll('.legend-item').forEach(function(el){el.addEventListener('click',function(){var f=el.getAttribute('data-filter');setStatusFilter(statusFilter===f?null:f,chartTab);});});
   document.getElementById('chartFilter').addEventListener('click',function(){setStatusFilter(null);});
   document.getElementById('exportBtn').addEventListener('click',function(e){e.preventDefault();exportTasks();});
+  
+  // 饼图tab切换
+  document.querySelectorAll('.chart-tab').forEach(function(tab){
+    tab.addEventListener('click',function(){
+      document.querySelectorAll('.chart-tab').forEach(function(t){t.classList.remove('active');});
+      tab.classList.add('active');
+      chartTab=tab.getAttribute('data-tab');
+      setStatusFilter(null);
+      render();
+    });
+  });
   
   // 初始化
   load();render();
