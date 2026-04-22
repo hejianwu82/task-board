@@ -111,8 +111,11 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;b
 .status-delayed{background:var(--red);}
 .task-info{flex:1;min-width:0;}
 .task-title{font-size:14px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-.task-meta{font-size:11px;color:var(--text3);margin-top:2px;display:flex;gap:8px;}
+.task-meta{font-size:11px;color:var(--text3);margin-top:2px;display:flex;gap:8px;align-items:center;}
 .task-date{color:var(--purple);}
+.task-timer{color:var(--accent);font-family:monospace;font-size:11px;}
+.task-timer.running{animation:timerPulse 2s infinite;}
+@keyframes timerPulse{0%,100%{opacity:1;}50%{opacity:.5;}}
 .status-badge{font-size:11px;font-weight:600;padding:4px 10px;border-radius:10px;cursor:pointer;white-space:nowrap;border:1px solid transparent;touch-action:manipulation;-webkit-tap-highlight-color:transparent;}
 .status-badge[data-status="待办"]{background:var(--surface3);color:var(--text3);}
 .status-badge[data-status="进行中"]{background:var(--yellow-bg);color:var(--yellow);}
@@ -142,9 +145,12 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;b
 .toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
 .toast.green{border-color:rgba(34,197,94,.4);color:var(--green);}
 .toast.red{border-color:rgba(239,68,68,.4);color:var(--red);}
+.filter-active-bar{position:fixed;top:0;left:0;right:0;height:3px;z-index:999;background:var(--accent);display:none;}
+.filter-active-bar.show{display:block;}
 </style>
 </head>
 <body>
+<div class="filter-active-bar" id="filterBar"></div>
 <div class="header">
   <div class="header-top">
     <div class="logo"><div class="logo-icon">📋</div>任务分配台</div>
@@ -215,6 +221,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;b
   <div class="modal">
     <div class="modal-handle"></div>
     <div class="modal-title" id="modalTitle">添加任务</div>
+    <div id="timerInfo" style="display:none;font-size:12px;color:var(--accent);margin-bottom:12px;padding:8px 12px;background:var(--accent-glow);border-radius:8px;"></div>
     <div class="form-group">
       <label class="form-label">任务内容</label>
       <input class="form-input" id="taskInput" placeholder="输入任务内容…" maxlength="200">
@@ -394,7 +401,8 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;b
   function setStatusFilter(filter,scope){
     statusFilter=filter;filterScope=scope||'today';
     var cf=document.getElementById('chartFilter');
-    if(filter){cf.classList.add('show');cf.textContent='✕ '+filter;}else{cf.classList.remove('show');}
+    var fb=document.getElementById('filterBar');
+    if(filter){cf.classList.add('show');cf.textContent='✕ '+filter;fb.classList.add('show');}else{cf.classList.remove('show');fb.classList.remove('show');}
     document.querySelectorAll('.stat-item').forEach(function(el){
       var s=el.getAttribute('data-scope');
       if(filter&&el.getAttribute('data-filter')===filter&&s===filterScope)el.classList.add('active');
@@ -429,10 +437,13 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;b
     });
     svg.innerHTML='<circle cx="50" cy="50" r="40" fill="none" stroke="#242428" stroke-width="20"/>'+html;
     svg.querySelectorAll('.pie-slice').forEach(function(el){
+      el.style.pointerEvents='stroke';
+      el.style.cursor='pointer';
       el.addEventListener('click',function(e){
         e.stopPropagation();e.preventDefault();
         var s=el.getAttribute('data-status');
-        setStatusFilter(statusFilter===s?null:s,chartTab);
+        if(statusFilter===s)setStatusFilter(null,null);
+        else setStatusFilter(s,chartTab);
       });
     });
   }
@@ -502,15 +513,37 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;b
     renderDateList();
   }
 
+  function fmtDuration(ms){
+    if(!ms||ms<=0)return'';
+    var s=Math.floor(ms/1000),m=Math.floor(s/60),h=Math.floor(m/60);
+    if(h>0)return h+'h '+String(m%60).padStart(2,'0')+'m';
+    return m+'m';
+  }
+  function getTimerHtml(task){
+    var now=Date.now();
+    if(task.status==='进行中'&&task.startedAt){
+      var elapsed=now-task.startedAt;
+      return'<span class="task-timer running">⏱ '+fmtDuration(elapsed)+'</span>';
+    }
+    if(task.status==='已完成'&&task.startedAt&&task.completedAt){
+      var dur=task.completedAt-task.startedAt;
+      return'<span class="task-timer">✅ '+fmtDuration(dur)+'</span>';
+    }
+    return'';
+  }
   function renderTaskItem(task,dateOverride){
     var ds=dateOverride||task.date||currentDate;
     var cls='task-item';
     if(task.status==='已完成')cls+=' done-task';
     if(task.status==='已延期')cls+=' delayed-task';
     var dotCls='status-'+(task.status==='已完成'?'done':task.status==='进行中'?'progress':task.status==='已延期'?'delayed':'todo');
-    var meta=escHtml(task.time||'');
-    if(isOverallMode&&ds)meta=(meta?meta+' · ':'')+fmtDateShort(ds);
-    return'<div class="'+cls+'" data-id="'+task.id+'" data-date="'+ds+'"><div class="status-dot '+dotCls+'"></div><div class="task-info"><div class="task-title">'+escHtml(task.title)+'</div>'+(meta?'<div class="task-meta">'+meta+'</div>':'')+'</div><span class="status-badge" data-status="'+task.status+'">'+task.status+'</span></div>';
+    var parts=[];
+    if(task.time)parts.push(escHtml(task.time));
+    if(isOverallMode&&ds)parts.push(fmtDateShort(ds));
+    var timerHtml=getTimerHtml(task);
+    if(timerHtml)parts.push(timerHtml);
+    var metaStr=parts.length?'<div class="task-meta">'+parts.join(' &middot; ')+'</div>':'';
+    return'<div class="'+cls+'" data-id="'+task.id+'" data-date="'+ds+'"><div class="status-dot '+dotCls+'"></div><div class="task-info"><div class="task-title">'+escHtml(task.title)+'</div>'+metaStr+'</div><span class="status-badge" data-status="'+task.status+'">'+task.status+'</span></div>';
   }
 
   function renderDateList(){
@@ -530,6 +563,15 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;b
     document.getElementById('timeInput').value=isEdit?(task.time||'18:00'):'18:00';
     document.getElementById('statusInput').value=isEdit?task.status:'待办';
     document.getElementById('modalDelete').style.display=isEdit?'block':'none';
+    // 显示计时信息
+    var timerInfo=document.getElementById('timerInfo');
+    if(isEdit&&task.startedAt){
+      var end=task.completedAt||Date.now();
+      timerInfo.style.display='block';
+      timerInfo.textContent='⏱ 已计时 '+fmtDuration(end-task.startedAt);
+    }else{
+      timerInfo.style.display='none';
+    }
     document.getElementById('modalOverlay').classList.add('show');
     setTimeout(function(){document.getElementById('taskInput').focus();},100);
   }
@@ -545,10 +587,20 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;b
     if(!assignee){showToast('请选择负责人','red');return;}
     var arr=getTasks(currentDate);
     if(editingId){
-      for(var i=0;i<arr.length;i++){if(arr[i].id===editingId){arr[i]={id:editingId,title:title,assignee:assignee,time:time,status:status};break;}}
+      for(var i=0;i<arr.length;i++){if(arr[i].id===editingId){
+        // 保留已有的计时数据
+        var oldStarted=arr[i].startedAt,oldCompleted=arr[i].completedAt;
+        var now=Date.now();
+        // 如果状态改变，更新计时
+        if(status==='进行中'&&arr[i].status!=='进行中'){oldStarted=now;oldCompleted=null;}
+        if(status==='已完成'){if(!oldStarted)oldStarted=now;oldCompleted=now;}
+        arr[i]={id:editingId,title:title,assignee:assignee,time:time,status:status,startedAt:oldStarted,completedAt:oldCompleted};
+        break;}}
       showToast('任务已更新','green');
     }else{
-      arr.push({id:Date.now().toString(),title:title,assignee:assignee,time:time,status:status});
+      var newTask={id:Date.now().toString(),title:title,assignee:assignee,time:time,status:status};
+      if(status==='进行中')newTask.startedAt=Date.now();
+      arr.push(newTask);
       showToast('任务已添加','green');
     }
     save();closeModal();render();
@@ -597,7 +649,24 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;b
       var arr=isOverallMode?(tasks[ds]||[]):getTasks(currentDate);
       var statuses=['待办','进行中','已完成','已延期'];
       for(var i=0;i<arr.length;i++){
-        if(arr[i].id===id){var idx=statuses.indexOf(arr[i].status);arr[i].status=statuses[(idx+1)%4];save();render();showToast('状态已更新','green');break;}
+        if(arr[i].id===id){
+          var oldStatus=arr[i].status;
+          var idx=statuses.indexOf(oldStatus);
+          var newStatus=statuses[(idx+1)%4];
+          // 自动记录计时
+          var now=Date.now();
+          if(newStatus==='进行中'&&oldStatus!=='进行中'){
+            arr[i].startedAt=now;
+            arr[i].completedAt=null;
+          }else if(newStatus==='已完成'){
+            if(!arr[i].startedAt)arr[i].startedAt=now;
+            arr[i].completedAt=now;
+          }else{
+            // 待办或已延期时保留计时数据不清除
+          }
+          arr[i].status=newStatus;
+          save();render();showToast('状态已更新','green');break;
+        }
       }
       return;
     }
@@ -640,6 +709,14 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;b
   // === 初始化 ===
   loadFromCloud();
   startAutoRefresh();
+  // 每30秒刷新进行中任务的计时显示
+  setInterval(function(){
+    var hasRunning=false;
+    Object.keys(tasks).forEach(function(ds){
+      tasks[ds].forEach(function(t){if(t.status==='进行中'&&t.startedAt)hasRunning=true;});
+    });
+    if(hasRunning)render();
+  },30000);
 })();
 </script>
 </body>
