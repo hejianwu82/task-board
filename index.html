@@ -259,7 +259,8 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;b
   var GH_REPO='task-board';
   var GH_FILE='data.json';
   var GH_API='https://api.github.com/repos/'+GH_USER+'/'+GH_REPO+'/contents/'+GH_FILE;
-  var GH_RAW='https://raw.githubusercontent.com/'+GH_USER+'/'+GH_REPO+'/main/'+GH_FILE;
+  // SHA用于缓存失效（每次保存后更新，浏览器自动拉最新代码）
+  var codeSha='1e17071f';
 
   var MEMBERS=[{name:'何建武',color:'#f59e0b'},{name:'陈新泉',color:'#3b82f6'},{name:'林焕伟',color:'#22c55e'}];
   var currentDate=todayStr();
@@ -309,20 +310,21 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;b
   // === 云端读写 ===
   function loadFromCloud(){
     setSyncStatus('syncing','同步中…');
-    // 先拿SHA
+    // 用API加载（带Authorization，不走CDN缓存），正确解码UTF-8
     fetch(GH_API,{
       headers:{'Authorization':'token '+GH_TOKEN,'Accept':'application/vnd.github.v3+json'}
     }).then(function(r){
-      if(!r.ok)throw new Error('SHA fetch failed');
+      if(!r.ok)throw new Error('HTTP '+r.status);
       return r.json();
     }).then(function(data){
       dataSha=data.sha;
-      // 用raw URL拿数据，浏览器自动处理UTF-8解码
-      return fetch(GH_RAW);
-    }).then(function(r){
-      if(!r.ok)throw new Error('Data fetch failed');
-      return r.json();
-    }).then(function(parsed){
+      // 正确解码：base64 → UTF-8字节 → 字符串
+      var b64=data.content.replace(/\n/g,'');
+      var binary=atob(b64);
+      var bytes=new Uint8Array(binary.length);
+      for(var i=0;i<binary.length;i++)bytes[i]=binary.charCodeAt(i);
+      var content=new TextDecoder('utf-8').decode(bytes);
+      var parsed=JSON.parse(content);
       if(parsed&&typeof parsed==='object'){tasks=parsed;}
       setSyncStatus('synced','已同步');
       lastSyncTime=Date.now();
@@ -378,10 +380,16 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;b
   function startAutoRefresh(){
     setInterval(function(){
       if(isSaving)return;
-      fetch(GH_RAW).then(function(r){
-        if(!r.ok)throw new Error('fetch failed');
-        return r.json();
-      }).then(function(parsed){
+      fetch(GH_API,{
+        headers:{'Authorization':'token '+GH_TOKEN,'Accept':'application/vnd.github.v3+json'}
+      }).then(function(r){return r.json();}).then(function(data){
+        dataSha=data.sha;
+        var b64=data.content.replace(/\n/g,'');
+        var binary=atob(b64);
+        var bytes=new Uint8Array(binary.length);
+        for(var i=0;i<binary.length;i++)bytes[i]=binary.charCodeAt(i);
+        var content=new TextDecoder('utf-8').decode(bytes);
+        var parsed=JSON.parse(content);
         if(parsed&&typeof parsed==='object'){
           var remoteStr=JSON.stringify(parsed);
           var localStr=JSON.stringify(tasks);
