@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>任务分配台</title>
+<title>任务分配台 v2.2</title>
 <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
 <style>
 *{margin:0;padding:0;box-sizing:border-box;}
@@ -266,7 +266,6 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;b
   var tasks={};
   var editingId=null;
   var statusFilter=null;
-  var filterScope='today';
   var chartTab='today';
   var isOverallMode=false;
   var isNavigating=false;
@@ -398,7 +397,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;b
 
   function save(){scheduleSave();}
 
-  function setStatusFilter(filter,scope){
+  function setStatusFilter(filter){
     statusFilter=filter;
     var cf=document.getElementById('chartFilter');
     var fb=document.getElementById('filterBar');
@@ -441,8 +440,8 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;b
       el.addEventListener('click',function(e){
         e.stopPropagation();e.preventDefault();
         var s=el.getAttribute('data-status');
-        if(statusFilter===s)setStatusFilter(null,null);
-        else setStatusFilter(s,chartTab);
+        if(statusFilter===s)setStatusFilter(null);
+        else setStatusFilter(s);
       });
     });
   }
@@ -690,11 +689,11 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;b
 
   document.querySelectorAll('.stat-item').forEach(function(el){
     el.addEventListener('click',function(){
-      var f=el.getAttribute('data-filter'),s=el.getAttribute('data-scope');
-      setStatusFilter(statusFilter===f&&filterScope===s?null:f,s);
+      var f=el.getAttribute('data-filter');
+      setStatusFilter(statusFilter===f?null:f);
     });
   });
-  document.querySelectorAll('.legend-item').forEach(function(el){el.addEventListener('click',function(){var f=el.getAttribute('data-filter');setStatusFilter(statusFilter===f?null:f,chartTab);});});
+  document.querySelectorAll('.legend-item').forEach(function(el){el.addEventListener('click',function(){var f=el.getAttribute('data-filter');setStatusFilter(statusFilter===f?null:f);});});
   document.getElementById('chartFilter').addEventListener('click',function(){setStatusFilter(null);});
   document.getElementById('exportBtn').addEventListener('click',function(e){e.preventDefault();exportTasks();});
 
