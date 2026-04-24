@@ -260,12 +260,13 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;b
   var GH_FILE='data.json';
   var GH_API='https://api.github.com/repos/'+GH_USER+'/'+GH_REPO+'/contents/'+GH_FILE;
   // SHA用于缓存失效（每次保存后更新，浏览器自动拉最新代码）
-  var codeSha='02c6e48a';
+  var codeSha='cef6405c';
 
   var MEMBERS=[{name:'何建武',color:'#f59e0b'},{name:'陈新泉',color:'#3b82f6'},{name:'林焕伟',color:'#22c55e'}];
   var currentDate=todayStr();
   var tasks={};
   var editingId=null;
+  var editingDate=null; // 记录正在编辑的任务所属日期
   var statusFilter=null;
   var chartTab='today';
   var isOverallMode=false;
@@ -566,8 +567,9 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;b
     list.innerHTML=html;
   }
 
-  function openModal(isEdit,task){
+  function openModal(isEdit,task,date){
     editingId=isEdit?task.id:null;
+    editingDate=isEdit?(date||currentDate):null;
     document.getElementById('modalTitle').textContent=isEdit?'编辑任务':'添加任务';
     document.getElementById('taskInput').value=isEdit?task.title:'';
     document.getElementById('assigneeInput').innerHTML='<option value="">选择负责人…</option>'+MEMBERS.map(function(m){return'<option value="'+m.name+'"'+(isEdit&&task.assignee===m.name?' selected':'')+'>'+m.name+'</option>';}).join('');
@@ -587,7 +589,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;b
     setTimeout(function(){document.getElementById('taskInput').focus();},100);
   }
 
-  function closeModal(){document.getElementById('modalOverlay').classList.remove('show');editingId=null;}
+  function closeModal(){document.getElementById('modalOverlay').classList.remove('show');editingId=null;editingDate=null;}
 
   function saveTask(){
     var title=document.getElementById('taskInput').value.trim();
@@ -596,7 +598,9 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;b
     var status=document.getElementById('statusInput').value;
     if(!title){showToast('请输入任务内容','red');return;}
     if(!assignee){showToast('请选择负责人','red');return;}
-    var arr=getTasks(currentDate);
+    // 编辑时使用任务原日期，新增时使用当前日期
+    var targetDate=editingDate||currentDate;
+    var arr=getTasks(targetDate);
     if(editingId){
       for(var i=0;i<arr.length;i++){if(arr[i].id===editingId){
         // 保留已有的计时数据
@@ -619,7 +623,8 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;b
 
   function deleteTask(){
     if(!editingId)return;
-    var arr=getTasks(currentDate);
+    var targetDate=editingDate||currentDate;
+    var arr=getTasks(targetDate);
     for(var i=0;i<arr.length;i++){if(arr[i].id===editingId){arr.splice(i,1);break;}}
     save();closeModal();render();showToast('任务已删除','green');
   }
@@ -683,8 +688,9 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;b
     }
     var item=e.target.closest('.task-item');if(!item)return;
     var id=item.getAttribute('data-id'),ds=item.getAttribute('data-date');
-    var arr=isOverallMode?(tasks[ds]||[]):getTasks(currentDate);
-    for(var i=0;i<arr.length;i++){if(arr[i].id===id){openModal(true,arr[i]);break;}}
+    // 始终从任务所属日期的数组中查找
+    var arr=tasks[ds]||[];
+    for(var i=0;i<arr.length;i++){if(arr[i].id===id){openModal(true,arr[i],ds);break;}}
   });
 
   document.getElementById('prevDay').addEventListener('click',function(e){e.preventDefault();e.stopPropagation();navigateDate(-1);});
