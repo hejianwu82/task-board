@@ -104,6 +104,10 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;b
 .task-item.done-task{opacity:.5;}
 .task-item.done-task .task-title{text-decoration:line-through;color:var(--text3);}
 .task-item.delayed-task{border-color:rgba(239,68,68,.3);background:rgba(239,68,68,.04);}
+.task-item.important-task{border-color:rgba(239,68,68,.5);background:rgba(239,68,68,.08);}
+.task-item.important-task .task-title{color:var(--red);font-weight:700;}
+.task-item.important-task.done-task .task-title{color:var(--red);text-decoration:line-through;opacity:.6;}
+.important-badge{display:inline-flex;align-items:center;gap:3px;font-size:10px;font-weight:700;color:#fff;background:var(--red);padding:1px 6px;border-radius:4px;margin-left:6px;vertical-align:middle;letter-spacing:.5px;}
 .status-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0;}
 .status-todo{background:var(--surface3);border:2px solid var(--text3);}
 .status-progress{background:var(--yellow);}
@@ -242,6 +246,12 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;b
         <option value="已完成">已完成</option>
         <option value="已延期">已延期</option>
       </select>
+    </div>
+    <div class="form-group" style="display:flex;align-items:center;justify-content:space-between;">
+      <label class="form-label" style="margin-bottom:0;">重要任务</label>
+      <div id="importantToggle" style="width:48px;height:26px;border-radius:13px;background:var(--surface3);border:1px solid var(--border);cursor:pointer;position:relative;transition:all .2s;touch-action:manipulation;-webkit-tap-highlight-color:transparent;">
+        <div id="importantToggleKnob" style="width:22px;height:22px;border-radius:50%;background:var(--text3);position:absolute;top:1px;left:1px;transition:all .2s;"></div>
+      </div>
     </div>
     <div class="modal-actions">
       <button class="btn btn-delete" id="modalDelete" style="display:none;">删除</button>
@@ -548,6 +558,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;b
     var cls='task-item';
     if(task.status==='已完成')cls+=' done-task';
     if(task.status==='已延期')cls+=' delayed-task';
+    if(task.important)cls+=' important-task';
     var dotCls='status-'+(task.status==='已完成'?'done':task.status==='进行中'?'progress':task.status==='已延期'?'delayed':'todo');
     var parts=[];
     if(task.time)parts.push(escHtml(task.time));
@@ -555,7 +566,8 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;b
     var timerHtml=getTimerHtml(task);
     if(timerHtml)parts.push(timerHtml);
     var metaStr=parts.length?'<div class="task-meta">'+parts.join(' &middot; ')+'</div>':'';
-    return'<div class="'+cls+'" data-id="'+task.id+'" data-date="'+ds+'"><div class="status-dot '+dotCls+'"></div><div class="task-info"><div class="task-title">'+escHtml(task.title)+'</div>'+metaStr+'</div><span class="status-badge" data-status="'+task.status+'">'+task.status+'</span></div>';
+    var impBadge=task.important?'<span class="important-badge">重要</span>':'';
+    return'<div class="'+cls+'" data-id="'+task.id+'" data-date="'+ds+'"><div class="status-dot '+dotCls+'"></div><div class="task-info"><div class="task-title">'+escHtml(task.title)+impBadge+'</div>'+metaStr+'</div><span class="status-badge" data-status="'+task.status+'">'+task.status+'</span></div>';
   }
 
   function renderDateList(){
@@ -567,15 +579,19 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;b
     list.innerHTML=html;
   }
 
+  var isImportant=false;
+
   function openModal(isEdit,task,date){
     editingId=isEdit?task.id:null;
     editingDate=isEdit?(date||currentDate):null;
+    isImportant=isEdit?!!task.important:false;
     document.getElementById('modalTitle').textContent=isEdit?'编辑任务':'添加任务';
     document.getElementById('taskInput').value=isEdit?task.title:'';
     document.getElementById('assigneeInput').innerHTML='<option value="">选择负责人…</option>'+MEMBERS.map(function(m){return'<option value="'+m.name+'"'+(isEdit&&task.assignee===m.name?' selected':'')+'>'+m.name+'</option>';}).join('');
     document.getElementById('timeInput').value=isEdit?(task.time||'18:00'):'18:00';
     document.getElementById('statusInput').value=isEdit?task.status:'待办';
     document.getElementById('modalDelete').style.display=isEdit?'block':'none';
+    updateImportantToggle();
     // 显示计时信息
     var timerInfo=document.getElementById('timerInfo');
     if(isEdit&&task.startedAt){
@@ -589,7 +605,19 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;b
     setTimeout(function(){document.getElementById('taskInput').focus();},100);
   }
 
-  function closeModal(){document.getElementById('modalOverlay').classList.remove('show');editingId=null;editingDate=null;}
+  function closeModal(){document.getElementById('modalOverlay').classList.remove('show');editingId=null;editingDate=null;isImportant=false;}
+
+  function updateImportantToggle(){
+    var toggle=document.getElementById('importantToggle');
+    var knob=document.getElementById('importantToggleKnob');
+    if(isImportant){
+      toggle.style.background='var(--red)';toggle.style.borderColor='var(--red)';
+      knob.style.left='25px';knob.style.background='#fff';
+    }else{
+      toggle.style.background='var(--surface3)';toggle.style.borderColor='var(--border)';
+      knob.style.left='1px';knob.style.background='var(--text3)';
+    }
+  }
 
   function saveTask(){
     var title=document.getElementById('taskInput').value.trim();
@@ -598,6 +626,8 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;b
     var status=document.getElementById('statusInput').value;
     if(!title){showToast('请输入任务内容','red');return;}
     if(!assignee){showToast('请选择负责人','red');return;}
+    // 重要任务标记
+    var important=isImportant;
     // 编辑时使用任务原日期，新增时使用当前日期
     var targetDate=editingDate||currentDate;
     var arr=getTasks(targetDate);
@@ -609,11 +639,11 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;b
         // 如果状态改变，更新计时
         if(status==='进行中'&&arr[i].status!=='进行中'){oldStarted=now;oldCompleted=null;}
         if(status==='已完成'){if(!oldStarted)oldStarted=now;oldCompleted=now;}
-        arr[i]={id:editingId,title:title,assignee:assignee,time:time,status:status,startedAt:oldStarted,completedAt:oldCompleted};
+        arr[i]={id:editingId,title:title,assignee:assignee,time:time,status:status,important:important,startedAt:oldStarted,completedAt:oldCompleted};
         break;}}
       showToast('任务已更新','green');
     }else{
-      var newTask={id:Date.now().toString(),title:title,assignee:assignee,time:time,status:status};
+      var newTask={id:Date.now().toString(),title:title,assignee:assignee,time:time,status:status,important:important};
       if(status==='进行中')newTask.startedAt=Date.now();
       arr.push(newTask);
       showToast('任务已添加','green');
@@ -651,6 +681,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;b
 
   // === 事件绑定 ===
   document.getElementById('addTaskBtn').addEventListener('click',function(e){e.preventDefault();openModal(false);});
+  document.getElementById('importantToggle').addEventListener('click',function(e){e.preventDefault();isImportant=!isImportant;updateImportantToggle();});
   document.getElementById('modalCancel').addEventListener('click',closeModal);
   document.getElementById('modalSubmit').addEventListener('click',saveTask);
   document.getElementById('modalDelete').addEventListener('click',deleteTask);
