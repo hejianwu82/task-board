@@ -15,7 +15,7 @@
   --yellow:#eab308;--yellow-bg:rgba(234,179,8,0.12);
   --red:#ef4444;--red-bg:rgba(239,68,68,0.12);
   --blue:#3b82f6;--blue-bg:rgba(59,130,246,0.12);
-  --purple:#a855f7;--purple-bg:rgba(168,85,247,0.12);
+  --purple:#a855f7;--purple-bg:rgba(168,85,247,0.12);--orange:#f97316;--orange-bg:rgba(249,115,22,0.12);
 }
 body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:var(--bg);color:var(--text);min-height:100vh;}
 .header{background:var(--surface);border-bottom:1px solid var(--border);padding:12px 16px;position:sticky;top:0;z-index:50;}
@@ -33,6 +33,9 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;b
 .menu-btn,.export-btn{width:36px;height:36px;border-radius:8px;border:1px solid var(--border);background:var(--surface2);color:var(--text2);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:14px;}
 .export-btn{width:auto;padding:0 12px;font-size:12px;font-weight:500;gap:4px;}
 .export-btn:hover{border-color:var(--accent);color:var(--accent);}
+.backup-btn,.restore-btn{width:auto;min-width:36px;height:36px;padding:0 10px;border-radius:8px;border:1px solid var(--border);background:var(--surface2);color:var(--text2);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:500;gap:4px;}
+.backup-btn:hover,.restore-btn:hover{border-color:var(--blue);color:var(--blue);}
+.restore-btn:hover{border-color:var(--green);color:var(--green);}
 .date-nav{display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
 .date-display{font-size:14px;font-weight:600;padding:4px 0;min-width:70px;text-align:center;}
 .nav-btn{width:32px;height:32px;border-radius:8px;border:1px solid var(--border);background:var(--surface2);color:var(--text2);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:14px;touch-action:manipulation;-webkit-tap-highlight-color:transparent;}
@@ -112,6 +115,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;b
 .status-todo{background:var(--surface3);border:2px solid var(--text3);}
 .status-progress{background:var(--yellow);}
 .status-done{background:var(--green);}
+.status-free{background:var(--orange);}
 .status-delayed{background:var(--red);}
 .task-info{flex:1;min-width:0;}
 .task-title{font-size:14px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
@@ -125,6 +129,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;b
 .status-badge[data-status="进行中"]{background:var(--yellow-bg);color:var(--yellow);}
 .status-badge[data-status="已完成"]{background:var(--green-bg);color:var(--green);}
 .status-badge[data-status="已延期"]{background:var(--red-bg);color:var(--red);}
+.status-badge[data-status="空闲安排"]{background:var(--orange-bg);color:var(--orange);}
 .empty-state{text-align:center;padding:40px 20px;color:var(--text3);}
 .empty-icon{font-size:48px;margin-bottom:12px;opacity:.3;}
 .section-title{font-size:13px;font-weight:600;color:var(--text2);padding:12px 0 8px;border-top:1px solid var(--border);margin-top:8px;}
@@ -149,6 +154,22 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;b
 .toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
 .toast.green{border-color:rgba(34,197,94,.4);color:var(--green);}
 .toast.red{border-color:rgba(239,68,68,.4);color:var(--red);}
+.backup-modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:250;display:flex;align-items:center;justify-content:center;opacity:0;pointer-events:none;transition:opacity .2s;}
+.backup-modal-overlay.show{opacity:1;pointer-events:all;}
+.backup-modal-content{background:var(--surface);border:1px solid var(--border);border-radius:16px;width:90%;max-width:380px;padding:20px;max-height:85vh;overflow-y:auto;transform:scale(.95);transition:transform .2s;}
+.backup-modal-overlay.show .backup-modal-content{transform:scale(1);}
+.backup-modal-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;font-size:15px;font-weight:700;}
+.backup-modal-close{width:32px;height:32px;border-radius:8px;border:none;background:var(--surface2);color:var(--text2);cursor:pointer;font-size:20px;flex-shrink:0;}
+.backup-section{margin-bottom:4px;}
+.backup-section-title{font-size:14px;font-weight:600;margin-bottom:6px;}
+.backup-desc{font-size:12px;color:var(--text3);margin-bottom:10px;line-height:1.5;}
+.backup-divider{height:1px;background:var(--border);margin:16px 0;}
+.btn-backup-action,.btn-restore-action{width:100%;padding:12px;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;border:none;margin-bottom:8px;touch-action:manipulation;-webkit-tap-highlight-color:transparent;}
+.btn-backup-action{background:var(--blue-bg);color:var(--blue);border:1px solid rgba(59,130,246,.3);}
+.btn-backup-action:active{background:rgba(59,130,246,.2);}
+.btn-restore-action{background:var(--green-bg);color:var(--green);border:1px solid rgba(34,197,94,.3);}
+.btn-restore-action:active{background:rgba(34,197,94,.2);}
+.backup-info-box{margin-top:12px;padding:10px 12px;background:var(--surface2);border-radius:8px;font-size:12px;color:var(--text3);line-height:1.6;min-height:44px;white-space:pre-wrap;word-break:break-all;}
 .filter-active-bar{position:fixed;top:0;left:0;right:0;height:3px;z-index:999;background:var(--accent);display:none;}
 .filter-active-bar.show{display:block;}
 </style>
@@ -161,6 +182,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;b
     <div class="header-actions">
       <div class="sync-indicator" id="syncIndicator"><div class="sync-dot"></div><span id="syncText">加载中…</span></div>
       <button class="export-btn" id="exportBtn">📥 导出</button>
+      <button class="backup-btn" id="backupBtn">💾 备份</button>
       <button class="menu-btn" id="menuBtn">☰</button>
     </div>
   </div>
@@ -213,6 +235,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;b
       <div class="legend-item" data-filter="已完成"><div class="legend-dot" style="background:#22c55e"></div><span>已完成</span><span class="legend-val" id="leg-done">0</span></div>
       <div class="legend-item" data-filter="进行中"><div class="legend-dot" style="background:#eab308"></div><span>进行中</span><span class="legend-val" id="leg-progress">0</span></div>
       <div class="legend-item" data-filter="待办"><div class="legend-dot" style="background:#5a5a66"></div><span>待办</span><span class="legend-val" id="leg-todo">0</span></div>
+      <div class="legend-item" data-filter="空闲安排"><div class="legend-dot" style="background:#f97316"></div><span>空闲安排</span><span class="legend-val" id="leg-free">0</span></div>
       <div class="legend-item" data-filter="已延期"><div class="legend-dot" style="background:#ef4444"></div><span>已延期</span><span class="legend-val" id="leg-delayed">0</span></div>
     </div>
   </div>
@@ -244,6 +267,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;b
         <option value="待办">待办</option>
         <option value="进行中">进行中</option>
         <option value="已完成">已完成</option>
+        <option value="空闲安排">空闲安排</option>
         <option value="已延期">已延期</option>
       </select>
     </div>
@@ -258,6 +282,27 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;b
       <button class="btn btn-cancel" id="modalCancel">取消</button>
       <button class="btn btn-submit" id="modalSubmit">保存</button>
     </div>
+  </div>
+</div>
+<div class="backup-modal-overlay" id="backupModal">
+  <div class="backup-modal-content">
+    <div class="backup-modal-header">
+      <span>💾 数据备份与恢复</span>
+      <button class="backup-modal-close" id="closeBackupModal">×</button>
+    </div>
+    <div class="backup-section">
+      <div class="backup-section-title">📤 导出备份</div>
+      <p class="backup-desc">将所有任务数据下载为备份文件，建议定期保存。</p>
+      <button class="btn-backup-action" id="doBackup">下载备份文件</button>
+    </div>
+    <div class="backup-divider"></div>
+    <div class="backup-section">
+      <div class="backup-section-title">📥 导入恢复</div>
+      <p class="backup-desc">选择之前保存的备份文件恢复数据，<strong style="color:var(--red)">会覆盖当前数据！</strong></p>
+      <input type="file" id="restoreFileInput" accept=".json,.txt" style="display:none;">
+      <button class="btn-restore-action" id="doRestore">选择备份文件恢复</button>
+    </div>
+    <div class="backup-info-box" id="backupInfoBox"></div>
   </div>
 </div>
 <div class="toast" id="toast"></div>
@@ -437,16 +482,17 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;b
 
   function drawPieChart(data){
     var svg=document.getElementById('pieChart'),total=data.length;
-    var counts={done:0,progress:0,todo:0,delayed:0};
-    data.forEach(function(t){if(t.status==='已完成')counts.done++;else if(t.status==='进行中')counts.progress++;else if(t.status==='待办')counts.todo++;else counts.delayed++;});
+    var counts={done:0,progress:0,todo:0,free:0,delayed:0};
+    data.forEach(function(t){if(t.status==='已完成')counts.done++;else if(t.status==='进行中')counts.progress++;else if(t.status==='待办')counts.todo++;else if(t.status==='空闲安排')counts.free++;else counts.delayed++;});
     document.getElementById('leg-done').textContent=counts.done;
     document.getElementById('leg-progress').textContent=counts.progress;
     document.getElementById('leg-todo').textContent=counts.todo;
+    document.getElementById('leg-free').textContent=counts.free;
     document.getElementById('leg-delayed').textContent=counts.delayed;
     if(total===0){svg.innerHTML='<circle cx="50" cy="50" r="40" fill="none" stroke="#242428" stroke-width="20"/><text x="50" y="50" text-anchor="middle" dy=".35em" fill="#5a5a66" font-size="11">暂无</text>';return;}
-    var colors={done:'#22c55e',progress:'#eab308',todo:'#5a5a66',delayed:'#ef4444'};
-    var statusMap={done:'已完成',progress:'进行中',todo:'待办',delayed:'已延期'};
-    var order=['done','progress','todo','delayed'];
+    var colors={done:'#22c55e',progress:'#eab308',todo:'#5a5a66',free:'#f97316',delayed:'#ef4444'};
+    var statusMap={done:'已完成',progress:'进行中',todo:'待办',free:'空闲安排',delayed:'已延期'};
+    var order=['done','progress','todo','free','delayed'];
     var R=40,C=2*Math.PI*R,offset=25;
     var html='';
     order.forEach(function(key){
@@ -485,14 +531,14 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;b
       document.getElementById('dateDisplay').textContent=isToday?'今天':(d.getMonth()+1)+'月'+d.getDate()+'日';
       document.getElementById('statsLabel').textContent=isToday?'当天任务':(d.getMonth()+1)+'月'+d.getDate()+'日任务';
     }
-    var tc={todo:0,progress:0,done:0,delayed:0};
-    todayTasks.forEach(function(t){if(t.status==='已完成')tc.done++;else if(t.status==='进行中')tc.progress++;else if(t.status==='待办')tc.todo++;else tc.delayed++;});
+    var tc={todo:0,progress:0,done:0,free:0,delayed:0};
+    todayTasks.forEach(function(t){if(t.status==='已完成')tc.done++;else if(t.status==='进行中')tc.progress++;else if(t.status==='待办')tc.todo++;else if(t.status==='空闲安排')tc.free++;else tc.delayed++;});
     document.getElementById('cnt-todo-today').textContent=tc.todo;
     document.getElementById('cnt-progress-today').textContent=tc.progress;
     document.getElementById('cnt-done-today').textContent=tc.done;
     document.getElementById('cnt-delayed-today').textContent=tc.delayed;
-    var ac={todo:0,progress:0,done:0,delayed:0};
-    allTasks.forEach(function(t){if(t.status==='已完成')ac.done++;else if(t.status==='进行中')ac.progress++;else if(t.status==='待办')ac.todo++;else ac.delayed++;});
+    var ac={todo:0,progress:0,done:0,free:0,delayed:0};
+    allTasks.forEach(function(t){if(t.status==='已完成')ac.done++;else if(t.status==='进行中')ac.progress++;else if(t.status==='待办')ac.todo++;else if(t.status==='空闲安排')ac.free++;else ac.delayed++;});
     document.getElementById('cnt-todo-all').textContent=ac.todo;
     document.getElementById('cnt-progress-all').textContent=ac.progress;
     document.getElementById('cnt-done-all').textContent=ac.done;
@@ -559,7 +605,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;b
     if(task.status==='已完成')cls+=' done-task';
     if(task.status==='已延期')cls+=' delayed-task';
     if(task.important)cls+=' important-task';
-    var dotCls='status-'+(task.status==='已完成'?'done':task.status==='进行中'?'progress':task.status==='已延期'?'delayed':'todo');
+    var dotCls='status-'+(task.status==='已完成'?'done':task.status==='进行中'?'progress':task.status==='空闲安排'?'free':task.status==='已延期'?'delayed':'todo');
     var parts=[];
     if(task.time)parts.push(escHtml(task.time));
     if(isOverallMode&&ds)parts.push(fmtDateShort(ds));
@@ -694,7 +740,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;b
       var item=badge.closest('.task-item');if(!item)return;
       var id=item.getAttribute('data-id'),ds=item.getAttribute('data-date');
       var arr=isOverallMode?(tasks[ds]||[]):getTasks(currentDate);
-      var statuses=['待办','进行中','已完成','已延期'];
+      var statuses=['待办','进行中','已完成','空闲安排','已延期'];
       for(var i=0;i<arr.length;i++){
         if(arr[i].id===id){
           var oldStatus=arr[i].status;
@@ -753,6 +799,53 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;b
       setStatusFilter(null);render();
     });
   });
+
+  // === 备份与恢复 ===
+  function doBackup(){
+    var all=getAllTasks();
+    if(!all.length){showToast('暂无数据可备份','red');return;}
+    var backup={version:2,exportedAt:new Date().toISOString(),taskCount:all.length,tasks:tasks};
+    var blob=new Blob([JSON.stringify(backup,null,2)],{type:'application/json'});
+    var url=URL.createObjectURL(blob);
+    var a=document.createElement('a');
+    a.href=url;a.download='任务分配台_备份_'+new Date().toLocaleString('zh-CN',{year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'}).replace(/\//g,'-').replace(/\s/g,'_').replace(/,/g,'')+'.json';
+    document.body.appendChild(a);a.click();document.body.removeChild(a);URL.revokeObjectURL(url);
+    var info='✅ 备份成功\n共 '+all.length+' 条任务\n时间：'+new Date().toLocaleString('zh-CN');
+    document.getElementById('backupInfoBox').textContent=info;
+    showToast('备份已下载（'+all.length+'条任务）','green');
+  }
+
+  function doRestore(){
+    document.getElementById('restoreFileInput').click();
+  }
+
+  document.getElementById('restoreFileInput').addEventListener('change',function(e){
+    var file=e.target.files[0];
+    if(!file)return;
+    var reader=new FileReader();
+    reader.onload=function(ev){
+      try{
+        var data=JSON.parse(ev.target.result);
+        if(!data.tasks||typeof data.tasks!=='object'){showToast('文件格式错误，不是有效的备份文件','red');return;}
+        var taskCount=0;
+        Object.keys(data.tasks).forEach(function(ds){taskCount+=(data.tasks[ds]||[]).length;});
+        if(!confirm('确认恢复？\n\n备份时间：'+(data.exportedAt?new Date(data.exportedAt).toLocaleString('zh-CN'):'未知')+'\n任务数量：'+taskCount+' 条\n\n当前数据将被覆盖，确定继续？'))return;
+        tasks=data.tasks;
+        save();
+        render();
+        document.getElementById('backupModal').classList.remove('show');
+        showToast('数据已恢复（'+taskCount+'条任务）','green');
+      }catch(ex){showToast('文件读取失败：'+ex.message,'red');}
+    };
+    reader.readAsText(file);
+    e.target.value='';
+  });
+
+  document.getElementById('doBackup').addEventListener('click',function(e){e.preventDefault();doBackup();});
+  document.getElementById('doRestore').addEventListener('click',function(e){e.preventDefault();doRestore();});
+  document.getElementById('closeBackupModal').addEventListener('click',function(){document.getElementById('backupModal').classList.remove('show');});
+  document.getElementById('backupBtn').addEventListener('click',function(e){e.preventDefault();document.getElementById('backupInfoBox').textContent='点击下方按钮开始备份或恢复数据。';document.getElementById('backupModal').classList.add('show');});
+  document.getElementById('backupModal').addEventListener('click',function(e){if(e.target===this)this.classList.remove('show');});
 
   // === 初始化 ===
   loadFromCloud();
